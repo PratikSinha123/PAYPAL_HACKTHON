@@ -1,0 +1,23 @@
+{
+  "name": "chargeguard-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "test": "tsx src/db.test.ts",
+    "typecheck": "tsc --noEmit",
+    "seed": "node --env-file=../.env --import tsx src/seed.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "*",
+    "dotenv": "*",
+    "fastify": "*",
+    "zod": "*"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "*",
+    "@types/node": "*",
+    "tsx": "*",
+    "typescript": "*"
+  }
+}
