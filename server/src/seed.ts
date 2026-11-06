@@ -1,10 +1,11 @@
 // Creates a sandbox product + plan + subscription. The buyer must approve it once in a browser.
 // Run: npm run seed [buyer-email]
-import { openDb } from "./db.js";
+import { openDb, initDb } from "./db.js";
 import { paypal } from "./paypal.js";
 
 const email = process.argv[2] ?? "buyer@example.com";
 const db = openDb();
+await initDb(db);
 type Id = { id: string; links?: { rel: string; href: string }[] };
 
 const product = await paypal<Id>("/v1/catalogs/products", { method: "POST", body: JSON.stringify({ name: "ChargeGuard Demo Plan", type: "SERVICE" }) });
@@ -25,6 +26,8 @@ const sub = await paypal<Id>("/v1/billing/subscriptions", {
     application_context: { user_action: "SUBSCRIBE_NOW", return_url: "https://example.com/ok", cancel_url: "https://example.com/cancel" },
   }),
 });
-db.prepare("INSERT OR REPLACE INTO subscriptions (paypal_subscription_id, customer_email, plan, status, custom_id) VALUES (?,?,?,?,?)")
-  .run(sub.id, email, plan.id, "APPROVAL_PENDING", customId);
+await db.execute({
+  sql: "INSERT OR REPLACE INTO subscriptions (paypal_subscription_id, customer_email, plan, status, custom_id) VALUES (?,?,?,?,?)",
+  args: [sub.id, email, plan.id, "APPROVAL_PENDING", customId],
+});
 console.log("subscription:", sub.id, "\nbuyer approval link (open, log in as the sandbox PERSONAL account):\n" + sub.links?.find((l) => l.rel === "approve")?.href);

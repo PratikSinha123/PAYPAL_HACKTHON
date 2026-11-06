@@ -1,10 +1,12 @@
-import Database from "better-sqlite3";
+import { createClient, type Client } from "@libsql/client";
 
-export function openDb(path = process.env.DB_PATH ?? "chargeguard.db") {
-  const db = new Database(path);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  db.exec(`
+export function openDb(url = `file:${process.env.DB_PATH ?? "chargeguard.db"}`) {
+  const db = createClient({ url });
+  return db;
+}
+export type Db = Client;
+
+const SCHEMA = `
 CREATE TABLE IF NOT EXISTS subscriptions (
   paypal_subscription_id TEXT PRIMARY KEY, customer_email TEXT, plan TEXT,
   status TEXT, next_billing TEXT, custom_id TEXT);
@@ -31,13 +33,19 @@ CREATE TABLE IF NOT EXISTS messages (
   direction TEXT CHECK (direction IN ('in','out')), body TEXT, sent_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS webhook_events (
   paypal_event_id TEXT PRIMARY KEY, event_type TEXT, raw TEXT, processed_at TEXT);
-`);
-  return db;
+`;
+
+/** Initialize schema. Must be called once before using the db. */
+export async function initDb(db: Db): Promise<void> {
+  // libsql executeMultiple supports multiple statements
+  await db.executeMultiple(SCHEMA);
 }
-export type Db = ReturnType<typeof openDb>;
 
 /** Idempotent store: returns false if PayPal already delivered this event. */
-export function storeEvent(db: Db, id: string, type: string, raw: string): boolean {
-  return db.prepare("INSERT OR IGNORE INTO webhook_events (paypal_event_id, event_type, raw) VALUES (?,?,?)")
-    .run(id, type, raw).changes === 1;
+export async function storeEvent(db: Db, id: string, type: string, raw: string): Promise<boolean> {
+  const result = await db.execute({
+    sql: "INSERT OR IGNORE INTO webhook_events (paypal_event_id, event_type, raw) VALUES (?,?,?)",
+    args: [id, type, raw],
+  });
+  return result.rowsAffected === 1;
 }

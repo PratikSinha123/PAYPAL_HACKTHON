@@ -9,13 +9,13 @@
     "seed": "node --env-file=../.env --import tsx src/seed.ts"
   },
   "dependencies": {
-    "better-sqlite3": "*",
+    "@libsql/client": "*",
     "dotenv": "*",
     "fastify": "*",
-    "zod": "*"
+    "zod": "^3",
+    "zod-to-json-schema": "*"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "*",
     "@types/node": "*",
     "tsx": "*",
     "typescript": "*"
