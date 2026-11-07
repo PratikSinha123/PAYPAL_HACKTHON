@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "test": "tsx src/db.test.ts",
+    "test:case": "tsx src/case-engine.test.ts",
     "typecheck": "tsc --noEmit",
     "ai:check": "node --env-file=../.env --import tsx src/ai-check.ts",
     "dispute": "node --env-file=../.env --import tsx src/dispute.ts",
