@@ -9,6 +9,7 @@ import { openCustomerCase, getCaseDetail, approveAction, rejectAction } from "./
 import { executeAction } from "./executor.js";
 import { generatePortalToken, verifyPortalToken, getPortalData } from "./portal.js";
 import { caseQueue, findDuplicateCharges, dunningCandidates } from "./rules.js";
+import { processCase } from "./ai-jobs.js";
 
 const db = openDb();
 const app = Fastify({ logger: true });
@@ -63,6 +64,8 @@ app.post("/portal/:token/report", async (req, reply) => {
   if (!sub) return reply.code(403).send({ error: "invalid token" });
   const { message } = req.body as { message: string };
   const caseId = openCustomerCase(db, sub, message);
+  // Auto-run AI pipeline in background to triage, assemble evidence, and draft recommendation
+  processCase(db, caseId).catch((err) => app.log.error({ err, caseId }, "AI case processing error"));
   return { case_id: caseId };
 });
 
@@ -85,6 +88,13 @@ app.get("/api/cases/:id", async (req, reply) => {
   const detail = getCaseDetail(db, Number(id));
   if (!detail) return reply.code(404).send({ error: "not found" });
   return detail;
+});
+
+app.post("/api/cases/:id/process", async (req, reply) => {
+  if (!ownerGuard(req)) return reply.code(401).send({ error: "unauthorized" });
+  const { id } = req.params as { id: string };
+  const result = await processCase(db, Number(id));
+  return result;
 });
 
 app.post("/api/actions/:id/approve", async (req, reply) => {
