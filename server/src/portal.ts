@@ -3,21 +3,56 @@ import type { Db } from "./db.js";
 import { openCustomerCase, getCaseDetail, addMessage } from "./case-engine.js";
 
 const SECRET = () => process.env.PORTAL_SECRET ?? "change-me";
+const DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-/** Generate a portal token for a subscription. Token = subscriptionId:hmac */
-export function generatePortalToken(subscriptionId: string): string {
-  const hmac = crypto.createHmac("sha256", SECRET()).update(subscriptionId).digest("hex").slice(0, 16);
-  return `${subscriptionId}:${hmac}`;
+/**
+ * Generate a signed, time-limited portal token for a subscription.
+ * Format: subscriptionId:exp:hmac
+ */
+export function generatePortalToken(subscriptionId: string, ttlSeconds = DEFAULT_TTL_SECONDS): string {
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const payload = `${subscriptionId}:${exp}`;
+  const hmac = crypto.createHmac("sha256", SECRET()).update(payload).digest("hex").slice(0, 16);
+  return `${subscriptionId}:${exp}:${hmac}`;
 }
 
-/** Verify and extract subscription ID from a portal token */
+/**
+ * Verify and extract subscription ID from a portal token.
+ * Enforces cryptographic HMAC signature and expiration timestamp.
+ */
 export function verifyPortalToken(token: string): string | null {
-  const [subscriptionId, hmac] = token.split(":");
-  if (!subscriptionId || !hmac) return null;
-  const expected = crypto.createHmac("sha256", SECRET()).update(subscriptionId).digest("hex").slice(0, 16);
-  if (hmac.length !== expected.length) return null;
-  if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expected))) return null;
-  return subscriptionId;
+  const parts = token.split(":");
+
+  // 1. New time-limited format: subscriptionId:exp:hmac
+  if (parts.length === 3) {
+    const [subscriptionId, expStr, hmac] = parts;
+    const exp = Number(expStr);
+    if (!subscriptionId || isNaN(exp) || !hmac) return null;
+
+    // Check expiry
+    const now = Math.floor(Date.now() / 1000);
+    if (now > exp) {
+      return null; // Expired!
+    }
+
+    const payload = `${subscriptionId}:${exp}`;
+    const expected = crypto.createHmac("sha256", SECRET()).update(payload).digest("hex").slice(0, 16);
+    if (hmac.length !== expected.length) return null;
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expected))) return null;
+    return subscriptionId;
+  }
+
+  // 2. Legacy format: subscriptionId:hmac (fallback compatibility)
+  if (parts.length === 2) {
+    const [subscriptionId, hmac] = parts;
+    if (!subscriptionId || !hmac) return null;
+    const expected = crypto.createHmac("sha256", SECRET()).update(subscriptionId).digest("hex").slice(0, 16);
+    if (hmac.length !== expected.length) return null;
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expected))) return null;
+    return subscriptionId;
+  }
+
+  return null;
 }
 
 /** Get portal data: subscription info, payment history, open cases & messages */

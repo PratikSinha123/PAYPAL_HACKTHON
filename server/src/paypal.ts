@@ -48,3 +48,23 @@ export async function verifyWebhook(headers: Record<string, unknown>, event: unk
   });
   return r.verification_status === "SUCCESS";
 }
+
+export type DisputeDetail = {
+  dispute_id: string;
+  dispute_life_cycle_stage?: string;
+  dispute_channel?: string;
+  dispute_amount?: { currency_code: string; value: string };
+  reason?: string;
+  status?: string;
+  seller_response_due_date?: string;
+  disputed_transactions?: Array<{
+    seller_transaction_id?: string;
+    buyer_transaction_id?: string;
+    gross_amount?: { currency_code: string; value: string };
+  }>;
+};
+
+/** Re-fetch authoritative dispute details from PayPal GET /v1/customer/disputes/{id} */
+export async function getDispute(disputeId: string): Promise<DisputeDetail> {
+  return paypal<DisputeDetail>(`/v1/customer/disputes/${disputeId}`);
+}

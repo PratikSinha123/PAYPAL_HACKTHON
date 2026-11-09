@@ -33,13 +33,31 @@ export function caseQueue(db: Db): Array<{
   deadline: string | null;
   opened_at: string;
   hours_remaining: number | null;
+  deadline_status: "none" | "overdue" | "urgent" | "warning" | "normal";
+  is_overdue: number;
+  is_urgent: number;
 }> {
   return db.prepare(`
     SELECT c.*,
       CASE WHEN c.deadline IS NOT NULL
         THEN ROUND((julianday(c.deadline) - julianday('now')) * 24, 1)
         ELSE NULL
-      END AS hours_remaining
+      END AS hours_remaining,
+      CASE
+        WHEN c.deadline IS NULL THEN 'none'
+        WHEN (julianday(c.deadline) - julianday('now')) * 24 <= 0 THEN 'overdue'
+        WHEN (julianday(c.deadline) - julianday('now')) * 24 <= 24 THEN 'urgent'
+        WHEN (julianday(c.deadline) - julianday('now')) * 24 <= 72 THEN 'warning'
+        ELSE 'normal'
+      END AS deadline_status,
+      CASE
+        WHEN c.deadline IS NOT NULL AND (julianday(c.deadline) - julianday('now')) * 24 <= 0 THEN 1
+        ELSE 0
+      END AS is_overdue,
+      CASE
+        WHEN c.deadline IS NOT NULL AND (julianday(c.deadline) - julianday('now')) * 24 > 0 AND (julianday(c.deadline) - julianday('now')) * 24 <= 24 THEN 1
+        ELSE 0
+      END AS is_urgent
     FROM cases c
     WHERE c.status NOT IN ('resolved', 'escalated')
     ORDER BY

@@ -42,7 +42,7 @@ app.post("/webhooks/paypal", async (req, reply) => {
   const fresh = storeEvent(db, ev.id!, String(ev.event_type), JSON.stringify(ev));
   if (fresh) {
     app.log.info({ type: ev.event_type }, "webhook stored");
-    dispatch(db, ev.id!, String(ev.event_type), JSON.stringify(ev));
+    await dispatch(db, ev.id!, String(ev.event_type), JSON.stringify(ev));
   }
   return { ok: true };
 });
@@ -127,6 +127,12 @@ app.post("/api/portal-token", async (req, reply) => {
   const { subscription_id } = req.body as { subscription_id: string };
   return { token: generatePortalToken(subscription_id) };
 });
+
+/* ───── Startup: Auto-advance stranded intake cases ───── */
+const stranded = db.prepare("SELECT id FROM cases WHERE status = 'intake'").all() as { id: number }[];
+for (const c of stranded) {
+  processCase(db, c.id).catch((err) => app.log.warn({ err, caseId: c.id }, "Auto-process intake case failed"));
+}
 
 /* ───── Start ───── */
 app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });

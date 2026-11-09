@@ -84,13 +84,39 @@ export function getCaseDetail(db: Db, caseId: number) {
     ? db.prepare("SELECT * FROM transactions WHERE subscription_id = ? ORDER BY created_at DESC").all(caseRow.subscription_id)
     : [];
 
-  // Compute hours remaining
+  // Compute hours remaining and urgency flags
   let hoursRemaining: number | null = null;
+  let deadlineStatus: "none" | "overdue" | "urgent" | "warning" | "normal" = "none";
+  let isOverdue = false;
+  let isUrgent = false;
+
   if (caseRow.deadline) {
     hoursRemaining = Math.round(((new Date(caseRow.deadline).getTime() - Date.now()) / 3600000) * 10) / 10;
+    if (hoursRemaining <= 0) {
+      deadlineStatus = "overdue";
+      isOverdue = true;
+    } else if (hoursRemaining <= 24) {
+      deadlineStatus = "urgent";
+      isUrgent = true;
+    } else if (hoursRemaining <= 72) {
+      deadlineStatus = "warning";
+    } else {
+      deadlineStatus = "normal";
+    }
   }
 
-  return { ...caseRow, hours_remaining: hoursRemaining, evidence, actions, messages, subscription, transactions };
+  return {
+    ...caseRow,
+    hours_remaining: hoursRemaining,
+    deadline_status: deadlineStatus,
+    is_overdue: isOverdue ? 1 : 0,
+    is_urgent: isUrgent ? 1 : 0,
+    evidence,
+    actions,
+    messages,
+    subscription,
+    transactions,
+  };
 }
 
 /** Add an evidence item to a case */
