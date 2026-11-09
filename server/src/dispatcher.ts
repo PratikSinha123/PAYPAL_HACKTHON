@@ -100,42 +100,28 @@ export function dispatch(db: Db, eventId: string, eventType: string, raw: string
       }
 
       /* ── Disputes ──────────────────────────────────────── */
-      case "CUSTOMER.DISPUTE.CREATED": {
-        const disputeId = resource.dispute_id as string;
-        const sellerTxnId = resource.disputed_transactions?.[0]?.seller_transaction_id as string | undefined;
-        const reasonCode = resource.reason as string | undefined;
-
-        // Look up subscription_id from the transaction
-        let subscriptionId: string | null = null;
-        if (sellerTxnId) {
-          const txn = db.prepare(
-            "SELECT subscription_id FROM transactions WHERE paypal_sale_id = ?"
-          ).get(sellerTxnId) as any;
-          subscriptionId = txn?.subscription_id ?? null;
-        }
-
-        // Only create if no case exists for this dispute
-        const existing = db.prepare("SELECT id FROM cases WHERE paypal_dispute_id = ?").get(disputeId) as any;
-        if (!existing) {
-          db.prepare(
-            `INSERT INTO cases (subscription_id, source, paypal_dispute_id, reason_code, status, deadline)
-             VALUES (?, 'paypal_dispute', ?, ?, 'intake', NULL)`
-          ).run(subscriptionId, disputeId, reasonCode ?? null);
-        }
-        break;
-      }
-
+      // CREATED can be missed (tunnel down), so CREATED and UPDATED both create-or-update the case.
+      case "CUSTOMER.DISPUTE.CREATED":
       case "CUSTOMER.DISPUTE.UPDATED": {
         const disputeId = resource.dispute_id as string;
-        const reasonCode = resource.reason as string | undefined;
-        const lifeCycleStage = resource.dispute_life_cycle_stage as string | undefined;
+        const sellerTxnId = resource.disputed_transactions?.[0]?.seller_transaction_id as string | undefined;
+        const reasonCode = (resource.reason as string | undefined) ?? null;
+        const deadline = (resource.seller_response_due_date as string | undefined) ?? null;
 
-        if (reasonCode) {
-          db.prepare("UPDATE cases SET reason_code = ? WHERE paypal_dispute_id = ?").run(reasonCode, disputeId);
-        }
-        if (lifeCycleStage === "CHARGEBACK") {
-          db.prepare("UPDATE cases SET status = 'escalated' WHERE paypal_dispute_id = ?").run(disputeId);
-        }
+        const subscriptionId = sellerTxnId
+          ? ((db.prepare("SELECT subscription_id FROM transactions WHERE paypal_sale_id = ?").get(sellerTxnId) as any)?.subscription_id ?? null)
+          : null;
+
+        // COALESCE: a later UPDATED without a field must not wipe what we already have.
+        // ponytail: chargeback stage stays an active case; only RESOLVED closes it.
+        db.prepare(
+          `INSERT INTO cases (subscription_id, source, paypal_dispute_id, reason_code, deadline)
+           VALUES (?, 'paypal_dispute', ?, ?, ?)
+           ON CONFLICT(paypal_dispute_id) DO UPDATE SET
+             reason_code = COALESCE(excluded.reason_code, reason_code),
+             deadline = COALESCE(excluded.deadline, deadline),
+             subscription_id = COALESCE(subscription_id, excluded.subscription_id)`
+        ).run(subscriptionId, disputeId, reasonCode, deadline);
         break;
       }
 

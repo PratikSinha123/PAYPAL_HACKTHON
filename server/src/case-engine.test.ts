@@ -207,6 +207,24 @@ dispatch(db, cancelEvent.id, cancelEvent.event_type, JSON.stringify(cancelEvent)
 assert.equal((db.prepare("SELECT status FROM subscriptions WHERE paypal_subscription_id = 'I-SUB001'").get() as any).status, "CANCELLED");
 console.log("✓ BILLING.SUBSCRIPTION.CANCELLED");
 
+// Regression: CREATED was missed, only UPDATED (chargeback stage) arrives -> still an active case with a deadline.
+const upd = {
+  id: "WH-UPD-ONLY", event_type: "CUSTOMER.DISPUTE.UPDATED",
+  resource: { dispute_id: "PP-R-REAL", reason: "MERCHANDISE_OR_SERVICE_NOT_AS_DESCRIBED", dispute_life_cycle_stage: "CHARGEBACK",
+    seller_response_due_date: "2099-01-01T00:00:00.000Z", disputed_transactions: [{ seller_transaction_id: "SALE-001" }] },
+};
+storeEvent(db, upd.id, upd.event_type, JSON.stringify(upd));
+dispatch(db, upd.id, upd.event_type, JSON.stringify(upd));
+const real = db.prepare("SELECT * FROM cases WHERE paypal_dispute_id = 'PP-R-REAL'").get() as any;
+assert.ok(real, "UPDATED alone must create the case");
+assert.equal(real.deadline, "2099-01-01T00:00:00.000Z");
+assert.notEqual(real.status, "escalated");
+assert.ok(caseQueue(db).some((c) => c.id === real.id), "chargeback case must stay in the queue");
+const upd2 = { ...upd, id: "WH-UPD-2", resource: { dispute_id: "PP-R-REAL" } }; // later update without fields must not wipe them
+dispatch(db, upd2.id, upd2.event_type, JSON.stringify(upd2));
+assert.equal((db.prepare("SELECT deadline FROM cases WHERE paypal_dispute_id = 'PP-R-REAL'").get() as any).deadline, "2099-01-01T00:00:00.000Z");
+console.log("✓ UPDATED-only dispute -> active case with deadline");
+
 console.log("\n═══════════════════════════════════════");
 console.log("  All Day 3–4 tests passed! ✓");
 console.log("═══════════════════════════════════════");

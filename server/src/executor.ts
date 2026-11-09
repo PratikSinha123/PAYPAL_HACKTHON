@@ -7,9 +7,6 @@ export async function executeAction(db: Db, actionId: number): Promise<void> {
   if (!action) throw new Error(`action ${actionId} not found`);
   if (action.status !== "approved") throw new Error(`action ${actionId} is '${action.status}', not 'approved'. THE GATE HOLDS.`);
 
-  // Mark as executing
-  db.prepare("UPDATE actions SET status = 'executed', executed_at = datetime('now') WHERE id = ?").run(actionId);
-
   // Also advance the case to 'executing' if it's in awaiting_approval
   const caseRow = db.prepare("SELECT status FROM cases WHERE id = ?").get(action.case_id) as any;
   if (caseRow?.status === "awaiting_approval") {
@@ -85,8 +82,8 @@ export async function executeAction(db: Db, actionId: number): Promise<void> {
       }
     }
 
-    // Store PayPal response
-    db.prepare("UPDATE actions SET paypal_response = ? WHERE id = ?").run(JSON.stringify(response ?? null), actionId);
+    // Only now is it executed: PayPal accepted the call.
+    db.prepare("UPDATE actions SET status = 'executed', executed_at = datetime('now'), paypal_response = ? WHERE id = ?").run(JSON.stringify(response ?? null), actionId);
 
     // Resolve the case
     db.prepare("UPDATE cases SET status = 'resolved', resolved_at = datetime('now'), outcome = 'executed' WHERE id = ? AND status = 'executing'").run(action.case_id);
