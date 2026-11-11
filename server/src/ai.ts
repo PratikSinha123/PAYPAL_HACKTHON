@@ -17,20 +17,33 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
 }
 
 /** One call for all three AI jobs: prompt in, zod-validated JSON out. Never free prose. */
-export async function generateJson<T extends z.ZodType>(schema: T, system: string, user: string): Promise<z.infer<T>> {
+export async function generateJson<T extends z.ZodType>(
+  schema: T,
+  system: string,
+  user: string,
+  retries = DELAYS_MS.length
+): Promise<z.infer<T>> {
   let lastError: Error | undefined;
 
-  for (let attempt = 0; attempt <= DELAYS_MS.length; attempt++) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     let r: Response | undefined;
     try {
       r = await fetchWithTimeout(`${process.env.AI_BASE_URL}/chat/completions`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${process.env.AI_API_KEY}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${process.env.AI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           model: process.env.AI_MODEL,
           response_format: { type: "json_object" },
           messages: [
-            { role: "system", content: `${system}\nReply with JSON only, matching this JSON Schema:\n${JSON.stringify(zodToJsonSchema(schema))}` },
+            {
+              role: "system",
+              content: `${system}\nReply with valid JSON only, strictly matching this JSON Schema:\n${JSON.stringify(
+                zodToJsonSchema(schema)
+              )}`,
+            },
             { role: "user", content: user },
           ],
         }),
@@ -38,9 +51,9 @@ export async function generateJson<T extends z.ZodType>(schema: T, system: strin
     } catch (err) {
       // Network-level errors (timeout, connection refused, etc.) are retryable
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt < DELAYS_MS.length) {
-        const delay = DELAYS_MS[attempt];
-        console.warn(`ai fetch failed (${lastError.message}), retrying in ${delay}ms (attempt ${attempt + 1}/${DELAYS_MS.length})...`);
+      if (attempt < retries) {
+        const delay = DELAYS_MS[attempt] ?? 1000 * Math.pow(2, attempt);
+        console.warn(`ai fetch failed (${lastError.message}), retrying in ${delay}ms (attempt ${attempt + 1}/${retries})...`);
         await new Promise((res) => setTimeout(res, delay));
       }
       continue;
@@ -48,7 +61,9 @@ export async function generateJson<T extends z.ZodType>(schema: T, system: strin
 
     if (r.ok) {
       const j = (await r.json()) as { choices: { message: { content: string } }[] };
-      return schema.parse(JSON.parse(j.choices[0].message.content)); // throws if model drifts from schema
+      const raw = j.choices[0]?.message?.content?.trim() ?? "{}";
+      const cleaned = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+      return schema.parse(JSON.parse(cleaned)); // throws if model drifts from schema
     }
 
     // Don't retry on auth or not-found errors
@@ -58,9 +73,9 @@ export async function generateJson<T extends z.ZodType>(schema: T, system: strin
 
     lastError = new Error(`ai ${r.status}: ${await r.text()}`);
 
-    if (attempt < DELAYS_MS.length) {
-      const delay = DELAYS_MS[attempt];
-      console.warn(`ai request failed with ${r.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${DELAYS_MS.length})...`);
+    if (attempt < retries) {
+      const delay = DELAYS_MS[attempt] ?? 1000 * Math.pow(2, attempt);
+      console.warn(`ai request failed with ${r.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${retries})...`);
       await new Promise((res) => setTimeout(res, delay));
     }
   }

@@ -5,17 +5,22 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "test": "tsx src/db.test.ts",
+    "test:case": "tsx src/case-engine.test.ts",
+    "test:ai": "node --env-file=../.env --import tsx src/ai-jobs.test.ts",
     "typecheck": "tsc --noEmit",
+    "ai:check": "node --env-file=../.env --import tsx src/ai-check.ts",
+    "dispute": "node --env-file=../.env --import tsx src/dispute.ts",
     "seed": "node --env-file=../.env --import tsx src/seed.ts"
   },
   "dependencies": {
-    "@libsql/client": "*",
+    "better-sqlite3": "*",
     "dotenv": "*",
     "fastify": "*",
     "zod": "^3",
     "zod-to-json-schema": "*"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "*",
     "@types/node": "*",
     "tsx": "*",
     "typescript": "*"
