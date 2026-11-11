@@ -35,3 +35,6 @@ jobs:
 
       - name: Run Case Engine & Rules tests
         run: npm run test:case
+
+      - name: Run Days 5-6 AI Layer tests
+        run: npm run test:ai
