@@ -1,3 +1,6 @@
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+dotenv.config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
 import assert from "node:assert/strict";
 import { openDb } from "./db.js";
 import {
@@ -65,8 +68,8 @@ const parsedDraft = DraftSchema.parse(mockDraft);
 assert.equal(parsedDraft.recommended_action.type, "ISSUE_REFUND");
 console.log("✓ Job 3 DraftSchema validation passed");
 
-// 2. Test End-to-End processCase with live Gemini model
-console.log("\nRunning live AI pipeline (Jobs 1, 2, 3) on customer duplicate complaint...");
+// 2. Test End-to-End processCase with live or fallback AI model
+console.log("\nRunning AI pipeline (Jobs 1, 2, 3) on customer duplicate complaint...");
 const caseId = openCustomerCase(
   db,
   "I-TEST-AI",

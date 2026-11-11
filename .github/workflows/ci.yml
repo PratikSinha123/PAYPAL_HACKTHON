@@ -24,6 +24,9 @@ jobs:
         with:
           node-version: 22.x
 
+      - name: Setup environment file
+        run: cp ../.env.example ../.env || true
+
       - name: Install dependencies
         run: npm install
 
