@@ -105,6 +105,62 @@ assert.equal(approvedAction.status, "approved");
 assert.equal(approvedAction.approved_by, "merchant-owner");
 console.log("✓ Owner approved action via Approval Gate");
 
+// 3. Test Fix 1 & 2: Fake evidence is marked missing; owner evidence is NOT wiped
+const inrCaseId = openCustomerCase(db, "I-TEST-AI", "I paid but never received my account access credentials");
+// Simulate owner adding evidence before or during case review
+const { addEvidence: addEv } = await import("./case-engine.js");
+const { runEvidenceAssessment } = await import("./ai-jobs.js");
+addEv(db, inrCaseId, "owner_customer_chat", "Customer Support Chat Transcript", true, "Chat log export", "owner");
+
+const inrTriage = {
+  reason_code: "INR" as const,
+  transaction_ref: "SALE-AI-1",
+  remedy_sought: "EXPLANATION" as const,
+  urgency: "MEDIUM" as const,
+  summary: "Customer states account access not received.",
+};
+await runEvidenceAssessment(db, inrCaseId, inrTriage);
+
+const inrEvidence = db.prepare("SELECT * FROM evidence_items WHERE case_id = ?").all(inrCaseId) as any[];
+const welcomeEmail = inrEvidence.find((e) => e.kind === "welcome_email");
+const ownerChat = inrEvidence.find((e) => e.kind === "owner_customer_chat");
+
+// Fix 1: Unverified access email must NOT be fake "present"; must be marked missing (0)
+assert.equal(welcomeEmail?.present, 0, "Access email without delivery proof must be marked missing");
+console.log("✓ Fix 1 verified: Unverified evidence items (access email, terms, specs) marked missing");
+
+// Fix 2: Owner-added evidence must NOT be wiped across runs
+assert.ok(ownerChat, "Owner-added evidence must be preserved across assessment runs");
+assert.equal(ownerChat?.present, 1);
+assert.equal(ownerChat?.source, "owner");
+console.log("✓ Fix 2 verified: Owner-added evidence is preserved and never wiped");
+
+// 4. Test Fix 3: Unchecked action payloads are strictly validated per action type
+const { proposeAction: testProposeAction } = await import("./case-engine.js");
+
+// Bogus sale ID should be rejected
+assert.throws(
+  () => testProposeAction(db, inrCaseId, "ISSUE_REFUND", { sale_id: "BOGUS-SALE-ID-999", amount: 9.99 }),
+  /does not match any transaction/,
+  "Wrong sale ID must be rejected by validation"
+);
+
+// Negative amount should be rejected
+assert.throws(
+  () => testProposeAction(db, inrCaseId, "ISSUE_REFUND", { sale_id: "SALE-AI-1", amount: -5.0 }),
+  /must be a positive number/,
+  "Negative refund amount must be rejected by validation"
+);
+
+// Excessive refund amount exceeding original transaction amount ($9.99) should be rejected
+assert.throws(
+  () => testProposeAction(db, inrCaseId, "ISSUE_REFUND", { sale_id: "SALE-AI-1", amount: 999.0 }),
+  /exceeds transaction sale amount/,
+  "Refund amount exceeding transaction amount must be rejected by validation"
+);
+
+console.log("✓ Fix 3 verified: Invalid refund amount & wrong sale ID rejected before reaching approval screen");
+
 console.log("\n═══════════════════════════════════════");
 console.log("  All Days 5–6 AI Tests Passed! ✓");
 console.log("═══════════════════════════════════════");

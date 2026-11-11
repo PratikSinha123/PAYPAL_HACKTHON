@@ -46,11 +46,94 @@ export function advanceCase(db: Db, caseId: number, newStatus: string): void {
   ).run(newStatus, caseId);
 }
 
-/** Propose an action for a case (AI or rules-generated) */
-export function proposeAction(db: Db, caseId: number, type: string, payload: object, proposedBy = "ai"): number {
+/** Validate an action payload per action type before it can reach the approval screen */
+export function validateActionPayload(db: Db, caseId: number, type: string, payload: Record<string, any>): Record<string, any> {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("Action payload must be a non-empty object");
+  }
+
+  const caseRow = db.prepare("SELECT * FROM cases WHERE id = ?").get(caseId) as any;
+  if (!caseRow) throw new Error(`case ${caseId} not found`);
+
+  switch (type) {
+    case "ISSUE_REFUND": {
+      if (!payload.sale_id || typeof payload.sale_id !== "string" || payload.sale_id.trim() === "") {
+        throw new Error("Invalid refund payload: sale_id is required and must be a non-empty string");
+      }
+
+      if (typeof payload.amount !== "number" || isNaN(payload.amount) || payload.amount <= 0) {
+        throw new Error(`Invalid refund payload: amount must be a positive number, received ${payload.amount}`);
+      }
+
+      // Check against recorded case transactions
+      if (caseRow.subscription_id) {
+        const matchingTxn = db.prepare(
+          "SELECT amount, currency FROM transactions WHERE paypal_sale_id = ? AND subscription_id = ?"
+        ).get(payload.sale_id, caseRow.subscription_id) as { amount: number; currency: string } | undefined;
+
+        if (matchingTxn) {
+          if (payload.amount > matchingTxn.amount) {
+            throw new Error(
+              `Invalid refund payload: refund amount $${payload.amount} exceeds transaction sale amount $${matchingTxn.amount}`
+            );
+          }
+          if (!payload.currency) {
+            payload.currency = matchingTxn.currency || "USD";
+          }
+        } else {
+          // If transactions exist for this case, sale_id must belong to one of them
+          const anyTxns = db.prepare(
+            "SELECT paypal_sale_id FROM transactions WHERE subscription_id = ?"
+          ).all(caseRow.subscription_id) as Array<{ paypal_sale_id: string }>;
+
+          if (anyTxns.length > 0) {
+            throw new Error(
+              `Invalid refund payload: sale_id '${payload.sale_id}' does not match any transaction for subscription ${caseRow.subscription_id}`
+            );
+          }
+        }
+      }
+      break;
+    }
+
+    case "CANCEL_SUBSCRIPTION": {
+      if (caseRow.subscription_id) {
+        if (payload.subscription_id && payload.subscription_id !== caseRow.subscription_id) {
+          throw new Error(
+            `Invalid cancellation payload: subscription_id '${payload.subscription_id}' does not match case subscription '${caseRow.subscription_id}'`
+          );
+        }
+        payload.subscription_id = caseRow.subscription_id;
+      }
+      break;
+    }
+
+    case "SEND_BUYER_MESSAGE": {
+      if (!payload.message || typeof payload.message !== "string" || payload.message.trim() === "") {
+        throw new Error("Invalid message payload: message must be a non-empty string");
+      }
+      break;
+    }
+
+    case "MAKE_OFFER": {
+      if (payload.offer_amount !== undefined) {
+        if (typeof payload.offer_amount !== "number" || isNaN(payload.offer_amount) || payload.offer_amount <= 0) {
+          throw new Error("Invalid offer payload: offer_amount must be a positive number");
+        }
+      }
+      break;
+    }
+  }
+
+  return payload;
+}
+
+/** Propose an action for a case (AI or rules-generated). Strictly validates payload. */
+export function proposeAction(db: Db, caseId: number, type: string, payload: Record<string, any>, proposedBy = "ai"): number {
+  const validatedPayload = validateActionPayload(db, caseId, type, payload);
   const result = db.prepare(
     "INSERT INTO actions (case_id, type, payload, proposed_by) VALUES (?, ?, ?, ?)"
-  ).run(caseId, type, JSON.stringify(payload), proposedBy);
+  ).run(caseId, type, JSON.stringify(validatedPayload), proposedBy);
   return Number(result.lastInsertRowid);
 }
 
@@ -120,10 +203,18 @@ export function getCaseDetail(db: Db, caseId: number) {
 }
 
 /** Add an evidence item to a case */
-export function addEvidence(db: Db, caseId: number, kind: string, label: string, present: boolean, value?: string): number {
+export function addEvidence(
+  db: Db,
+  caseId: number,
+  kind: string,
+  label: string,
+  present: boolean,
+  value?: string,
+  source: "auto" | "owner" = "owner"
+): number {
   const result = db.prepare(
-    "INSERT INTO evidence_items (case_id, kind, label, present, value) VALUES (?, ?, ?, ?, ?)"
-  ).run(caseId, kind, label, present ? 1 : 0, value ?? null);
+    "INSERT INTO evidence_items (case_id, kind, label, present, value, source) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(caseId, kind, label, present ? 1 : 0, value ?? null, source);
   return Number(result.lastInsertRowid);
 }
 

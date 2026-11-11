@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS cases (
   deadline TEXT, opened_at TEXT DEFAULT CURRENT_TIMESTAMP, resolved_at TEXT, outcome TEXT);
 CREATE TABLE IF NOT EXISTS evidence_items (
   id INTEGER PRIMARY KEY, case_id INTEGER REFERENCES cases(id), kind TEXT, label TEXT,
-  present INTEGER NOT NULL DEFAULT 0, value TEXT);
+  present INTEGER NOT NULL DEFAULT 0, value TEXT, source TEXT DEFAULT 'auto');
 CREATE TABLE IF NOT EXISTS actions (
   id INTEGER PRIMARY KEY, case_id INTEGER REFERENCES cases(id),
   type TEXT CHECK (type IN ('SEND_BUYER_MESSAGE','ISSUE_REFUND','MAKE_OFFER','PROVIDE_EVIDENCE','ACCEPT_CLAIM','CANCEL_SUBSCRIPTION')),
@@ -32,6 +32,13 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE TABLE IF NOT EXISTS webhook_events (
   paypal_event_id TEXT PRIMARY KEY, event_type TEXT, raw TEXT, processed_at TEXT);
 `);
+
+  try {
+    db.exec("ALTER TABLE evidence_items ADD COLUMN source TEXT DEFAULT 'auto'");
+  } catch {
+    // column already exists
+  }
+
   return db;
 }
 export type Db = ReturnType<typeof openDb>;

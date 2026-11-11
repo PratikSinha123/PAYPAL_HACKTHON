@@ -148,8 +148,20 @@ export async function runEvidenceAssessment(
   const detail = getCaseDetail(db, caseId);
   if (!detail) throw new Error(`case ${caseId} not found`);
 
-  // Clear any existing auto-evidence for idempotency
-  db.prepare("DELETE FROM evidence_items WHERE case_id = ?").run(caseId);
+  // Clear only previously auto-generated evidence for idempotency.
+  // NEVER delete evidence the owner added!
+  db.prepare("DELETE FROM evidence_items WHERE case_id = ? AND (source = 'auto' OR source IS NULL)").run(caseId);
+
+  // Read existing owner-added evidence so we do not overwrite or duplicate it
+  const existingOwnerEvidence = db.prepare(
+    "SELECT kind FROM evidence_items WHERE case_id = ? AND source = 'owner'"
+  ).all(caseId) as Array<{ kind: string }>;
+  const ownerKinds = new Set(existingOwnerEvidence.map((e) => e.kind));
+
+  const addAutoEvidence = (kind: string, label: string, present: boolean, value?: string) => {
+    if (ownerKinds.has(kind)) return; // Preserve owner-provided evidence!
+    addEvidence(db, caseId, kind, label, present, value, "auto");
+  };
 
   // Check what data exists in DB
   const hasSub = Boolean(detail.subscription);
@@ -157,39 +169,44 @@ export async function runEvidenceAssessment(
   const hasTxn = txns.length > 0;
   const duplicateMatch = detail.subscription_id ? matchDuplicateForSubscription(db, detail.subscription_id) : null;
 
-  // Insert standard evidence items based on reason_code
+  // Insert standard evidence items based on verified DB data
   if (hasSub) {
-    addEvidence(db, caseId, "subscription_record", "Active PayPal Billing Agreement", true, detail.subscription_id);
+    addAutoEvidence("subscription_record", "Active PayPal Billing Agreement", true, detail.subscription_id);
   } else {
-    addEvidence(db, caseId, "subscription_record", "PayPal Billing Agreement Record", false);
+    addAutoEvidence("subscription_record", "PayPal Billing Agreement Record", false);
   }
 
   if (hasTxn) {
     const saleId = triage.transaction_ref ?? txns[0]?.paypal_sale_id;
-    addEvidence(db, caseId, "transaction_receipt", "PayPal Sale Transaction Record", true, saleId);
+    addAutoEvidence("transaction_receipt", "PayPal Sale Transaction Record", true, saleId);
   } else {
-    addEvidence(db, caseId, "transaction_receipt", "PayPal Sale Transaction Record", false);
+    addAutoEvidence("transaction_receipt", "PayPal Sale Transaction Record", false);
   }
 
-  // Reason-code specific evidence additions
+  // Reason-code specific evidence additions: only mark present if real DB proof exists!
   if (triage.reason_code === "DUPLICATE") {
     if (duplicateMatch) {
-      addEvidence(db, caseId, "twin_ledger", "SQL Ledger Duplicate Charges Match", true, `${duplicateMatch.first_sale_id} & ${duplicateMatch.second_sale_id}`);
+      addAutoEvidence("twin_ledger", "SQL Ledger Duplicate Charges Match", true, `${duplicateMatch.first_sale_id} & ${duplicateMatch.second_sale_id}`);
     } else {
-      addEvidence(db, caseId, "twin_ledger", "SQL Ledger Duplicate Charges Match", false);
+      addAutoEvidence("twin_ledger", "SQL Ledger Duplicate Charges Match", false);
     }
-    addEvidence(db, caseId, "billing_schedule", "Standard Monthly Renewal Cycle", true, "1 Month Interval");
+    // Billing schedule is verified from active subscription
+    addAutoEvidence("billing_schedule", "Standard Monthly Renewal Cycle", hasSub, hasSub ? "1 Month Interval" : undefined);
   } else if (triage.reason_code === "INR") {
-    addEvidence(db, caseId, "access_log", "Digital Account Access / Login Logs", false);
-    addEvidence(db, caseId, "welcome_email", "Access Provisioning Confirmation Email", true, "Automated webhook dispatch");
+    addAutoEvidence("access_log", "Digital Account Access / Login Logs", false);
+    // Unverified: app has no email delivery proof
+    addAutoEvidence("welcome_email", "Access Provisioning Confirmation Email", false);
   } else if (triage.reason_code === "SNAD") {
-    addEvidence(db, caseId, "terms_acceptance", "Terms of Service Accepted at Checkout", true, "Checkout acceptance timestamp");
-    addEvidence(db, caseId, "product_specs", "Public Service Feature Specification", true, "Plan Service Definition");
+    // Unverified: app has no clickwrap acceptance or feature spec documents attached
+    addAutoEvidence("terms_acceptance", "Terms of Service Accepted at Checkout", false);
+    addAutoEvidence("product_specs", "Public Service Feature Specification", false);
   } else if (triage.reason_code === "UNAUTHORIZED") {
-    addEvidence(db, caseId, "login_ip_match", "Subscriber IP & Device Match Record", false);
-    addEvidence(db, caseId, "recurring_history", "Prior Successful Subscription Payments", txns.length > 1, `${txns.length} prior sales`);
+    addAutoEvidence("login_ip_match", "Subscriber IP & Device Match Record", false);
+    // Verified: prior recurring payments confirmed from transactions table
+    addAutoEvidence("recurring_history", "Prior Successful Subscription Payments", txns.length > 1, txns.length > 1 ? `${txns.length} prior sales` : undefined);
   } else {
-    addEvidence(db, caseId, "cancellation_policy", "Published Subscription Cancellation Policy", true, "Terms Section 4.2");
+    // Unverified: app has no published cancellation policy document attached
+    addAutoEvidence("cancellation_policy", "Published Subscription Cancellation Policy", false);
   }
 
   // Refresh evidence list from DB
@@ -259,12 +276,43 @@ Evidence Missing: ${evidence.missing.join(", ")}`;
 
   const result = await generateJson(DraftSchema, system, user);
 
-  // Enqueue proposed action for the Approval Gate
+  // Validate and sanitize the AI proposed action payload before proposing
+  let actionPayload: Record<string, any> = { ...result.recommended_action.payload };
+  if (result.recommended_action.type === "ISSUE_REFUND") {
+    // Ensure sale_id is valid from case transactions
+    const validSaleIds = new Set(txns.map((t: any) => t.paypal_sale_id));
+    if (!actionPayload.sale_id || !validSaleIds.has(actionPayload.sale_id)) {
+      actionPayload.sale_id = targetSaleId;
+    }
+    const matchingTxn = txns.find((t: any) => t.paypal_sale_id === actionPayload.sale_id);
+    const maxAmount = matchingTxn?.amount ?? amount;
+    if (
+      typeof actionPayload.amount !== "number" ||
+      isNaN(actionPayload.amount) ||
+      actionPayload.amount <= 0 ||
+      actionPayload.amount > maxAmount
+    ) {
+      actionPayload.amount = maxAmount;
+    }
+    if (!actionPayload.currency && matchingTxn?.currency) {
+      actionPayload.currency = matchingTxn.currency;
+    }
+  } else if (result.recommended_action.type === "CANCEL_SUBSCRIPTION") {
+    if (detail.subscription_id) {
+      actionPayload.subscription_id = detail.subscription_id;
+    }
+  } else if (result.recommended_action.type === "SEND_BUYER_MESSAGE") {
+    if (!actionPayload.message || typeof actionPayload.message !== "string") {
+      actionPayload.message = result.buyer_message || "We are reviewing your account.";
+    }
+  }
+
+  // Enqueue proposed action for the Approval Gate (strictly validated via proposeAction)
   const actionId = proposeAction(
     db,
     caseId,
     result.recommended_action.type,
-    result.recommended_action.payload,
+    actionPayload,
     "ai"
   );
 
