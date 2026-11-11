@@ -37,21 +37,36 @@ function generateFallbackJson<T extends z.ZodType>(schema: T, system: string, us
     const amountMatch = user.match(/Amount:\s*\$?([0-9.]+)/i);
     const amount = amountMatch ? parseFloat(amountMatch[1]) : 9.99;
 
-    if (lowerUser.includes("duplicate")) {
+    if (isDispute) {
+      dispute_evidence_text = `Merchant representment: verified system records confirm transaction ${saleId} and service provisioning under agreed terms.`;
+    }
+
+    const toneMatch = user.match(/Merchant Tone:\s*([^\s\n]+)/i);
+    const tone = toneMatch ? toneMatch[1] : "empathetic_professional";
+
+    if (isDispute && !lowerUser.includes("duplicate")) {
+      type = "PROVIDE_EVIDENCE";
+      payload = { note: "Access logs and transaction history attached.", dispute_evidence_text, evidence_type: "OTHER" };
+      reasoning = "Merchant records verify valid subscription access provided.";
+      buyer_message = "We have submitted documentation to PayPal confirming your active subscription service.";
+    } else if (lowerUser.includes("duplicate")) {
       type = "ISSUE_REFUND";
       payload = { sale_id: saleId, amount, note: "Duplicate billing refund" };
       reasoning = "Pure SQL rule identified twin charges. Automatic refund recommended.";
-      buyer_message = `Hello, we noticed the duplicate $${amount} charge on your account and have initiated a full refund for transaction ${saleId}.`;
+      if (tone === "firm_formal") {
+        buyer_message = `Our system confirmed two renewal charges on your account. A refund of $${amount} has been submitted for transaction ${saleId}.`;
+      } else if (tone === "conciliatory") {
+        buyer_message = `We are so sorry for the double charge of $${amount}! We have initiated an immediate full refund for transaction ${saleId}.`;
+      } else if (tone === "friendly") {
+        buyer_message = `Hey! Good catch on the double charge of $${amount}. We've initiated a full refund for transaction ${saleId}!`;
+      } else {
+        buyer_message = `Hello, we noticed the duplicate $${amount} charge on your account and have initiated a full refund for transaction ${saleId}.`;
+      }
     } else if (lowerUser.includes("subscription_cancel")) {
       type = "CANCEL_SUBSCRIPTION";
       payload = { reason: "Customer requested cancellation" };
       reasoning = "Customer requested cancellation through portal.";
       buyer_message = "Hello, we have processed your subscription cancellation as requested. No further renewals will occur.";
-    } else if (isDispute) {
-      type = "PROVIDE_EVIDENCE";
-      payload = { note: "Access logs and transaction history attached." };
-      reasoning = "Merchant records verify valid subscription access provided.";
-      dispute_evidence_text = "Service was fully provisioned for active subscription. System logs confirm continuous access.";
     } else {
       type = "SEND_BUYER_MESSAGE";
       payload = { message: buyer_message };

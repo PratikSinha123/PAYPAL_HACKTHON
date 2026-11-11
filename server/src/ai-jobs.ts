@@ -233,13 +233,27 @@ ${JSON.stringify(evidenceList.map((e) => ({ label: e.label, present: Boolean(e.p
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Job 3: Drafting & Recommendation
+   Job 3: Drafting & Recommendation (Tone-Conditioned)
    ═══════════════════════════════════════════════════════════════ */
+export type MerchantTone = "empathetic_professional" | "firm_formal" | "conciliatory" | "friendly";
+
+export const TONE_GUIDELINES: Record<MerchantTone, string> = {
+  empathetic_professional:
+    "Empathetic, clear, and professional. Acknowledge customer frustration constructively while remaining objective.",
+  firm_formal:
+    "Formal, polite, and firm. Reference terms of service, billing policies, and verified system logs clearly.",
+  conciliatory:
+    "Warm, apologetic, and solution-focused. Prioritize customer delight, swift resolution, and retaining trust.",
+  friendly:
+    "Approachable, conversational, and direct. Explain what happened simply without corporate jargon.",
+};
+
 export async function runDrafting(
   db: Db,
   caseId: number,
   triage: TriageResult,
-  evidence: EvidenceResult
+  evidence: EvidenceResult,
+  tone?: MerchantTone
 ): Promise<DraftResult> {
   const detail = getCaseDetail(db, caseId);
   if (!detail) throw new Error(`case ${caseId} not found`);
@@ -249,11 +263,18 @@ export async function runDrafting(
   const amount = txns.find((t: any) => t.paypal_sale_id === targetSaleId)?.amount ?? 9.99;
 
   const isDispute = detail.source === "paypal_dispute";
+  const merchantTone: MerchantTone = tone ?? (process.env.MERCHANT_TONE as MerchantTone) ?? "empathetic_professional";
+  const toneGuide = TONE_GUIDELINES[merchantTone] ?? TONE_GUIDELINES.empathetic_professional;
 
   const system = `You are ChargeGuard AI's dispute resolution and deflection copywriter.
-Conditioned on the triage reason (${triage.reason_code}) and evidence assessment (${evidence.strength}):
-1. Generate a polite, empathetic buyer-facing message ('buyer_message') to resolve the problem directly with the customer.
-2. If this is a formal PayPal dispute, also generate formal representment text ('dispute_evidence_text') for PayPal adjudicators.
+Conditioned on:
+- Reason code: ${triage.reason_code}
+- Evidence strength: ${evidence.strength}
+- Merchant tone setting: ${merchantTone} (${toneGuide})
+
+Your instructions:
+1. Generate a buyer-facing message ('buyer_message') matching the "${merchantTone}" tone to resolve the problem directly with the customer.
+2. If this is a formal PayPal dispute, also generate formal representment text ('dispute_evidence_text') for PayPal adjudicators referencing available evidence items.
 3. Recommend exactly one actionable next step ('recommended_action') from:
    - SEND_BUYER_MESSAGE
    - ISSUE_REFUND
@@ -265,6 +286,7 @@ The action payload must contain required fields (e.g. sale_id, amount, note, or 
 
   const user = `Case ID: ${caseId}
 Source: ${detail.source} (isDispute: ${isDispute})
+Merchant Tone: ${merchantTone}
 Customer Email: ${detail.subscription?.customer_email ?? "customer"}
 Triage Summary: ${triage.summary}
 Remedy Sought: ${triage.remedy_sought}
@@ -335,7 +357,8 @@ Evidence Missing: ${evidence.missing.join(", ")}`;
    ═══════════════════════════════════════════════════════════════ */
 export async function processCase(
   db: Db,
-  caseId: number
+  caseId: number,
+  tone?: MerchantTone
 ): Promise<{
   triage: TriageResult;
   evidence: EvidenceResult;
@@ -348,8 +371,8 @@ export async function processCase(
   // Job 2: Evidence Assessment
   const evidence = await runEvidenceAssessment(db, caseId, triage);
 
-  // Job 3: Drafting & Recommendation
-  const draft = await runDrafting(db, caseId, triage, evidence);
+  // Job 3: Drafting & Recommendation (Tone-Conditioned)
+  const draft = await runDrafting(db, caseId, triage, evidence, tone);
 
   // Retrieve enqueued action ID
   const latestAction = db

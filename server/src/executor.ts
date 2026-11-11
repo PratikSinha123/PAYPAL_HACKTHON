@@ -56,9 +56,23 @@ export async function executeAction(db: Db, actionId: number): Promise<void> {
       case "PROVIDE_EVIDENCE": {
         const disputeId = db.prepare("SELECT paypal_dispute_id FROM cases WHERE id = ?").get(action.case_id) as any;
         if (disputeId?.paypal_dispute_id) {
+          // PayPal Disputes API expects { evidences: [{ evidence_type, notes }] }
+          const notesText =
+            typeof payload.evidence === "string"
+              ? payload.evidence
+              : payload.notes || payload.dispute_evidence_text || JSON.stringify(payload.evidence ?? "Merchant evidence submitted");
+          const evidenceType = payload.evidence_type ?? "OTHER";
+
           response = await paypal(`/v1/customer/disputes/${disputeId.paypal_dispute_id}/provide-evidence`, {
             method: "POST",
-            body: JSON.stringify({ evidence: payload.evidence }),
+            body: JSON.stringify({
+              evidences: [
+                {
+                  evidence_type: evidenceType,
+                  notes: notesText,
+                },
+              ],
+            }),
           });
         }
         break;

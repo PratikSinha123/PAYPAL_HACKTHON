@@ -161,6 +161,33 @@ assert.throws(
 
 console.log("✓ Fix 3 verified: Invalid refund amount & wrong sale ID rejected before reaching approval screen");
 
+// 5. Test Merchant-Tone Conditioning
+const toneResult = await processCase(db, caseId, "conciliatory");
+assert.ok(toneResult.draft.buyer_message?.toLowerCase().includes("sorry"), "Conciliatory tone should include apology phrasing");
+console.log("✓ Merchant-tone conditioning verified (conciliatory tone adjusted buyer message)");
+
+// 6. Test Dispute Case: Both texts (buyer_message AND dispute_evidence_text) produced
+db.prepare(
+  "INSERT INTO subscriptions (paypal_subscription_id, customer_email, status) VALUES ('I-TEST-DISP', 'buyer-disp@example.com', 'ACTIVE')"
+).run();
+db.prepare(
+  "INSERT INTO transactions (paypal_sale_id, subscription_id, amount, status, created_at) VALUES ('SALE-DISP-1', 'I-TEST-DISP', 29.99, 'COMPLETED', datetime('now'))"
+).run();
+const disputeCaseResult = db.prepare(
+  "INSERT INTO cases (subscription_id, source, paypal_dispute_id, reason_code, status) VALUES ('I-TEST-DISP', 'paypal_dispute', 'PP-D-TEST-LIVE', 'MERCHANDISE_OR_SERVICE_NOT_RECEIVED', 'intake')"
+).run();
+const dispCaseId = Number(disputeCaseResult.lastInsertRowid);
+db.prepare("INSERT INTO messages (case_id, direction, body) VALUES (?, 'in', ?)").run(
+  dispCaseId,
+  "I did not receive access to the subscription after paying."
+);
+const disputePipelineResult = await processCase(db, dispCaseId);
+
+assert.ok(disputePipelineResult.draft.buyer_message, "Dispute case must produce buyer_message");
+assert.ok(disputePipelineResult.draft.dispute_evidence_text, "Dispute case must produce dispute_evidence_text");
+assert.equal(disputePipelineResult.draft.recommended_action.type, "PROVIDE_EVIDENCE");
+console.log("✓ Dispute drafting end-to-end verified: both buyer_message and dispute_evidence_text produced");
+
 console.log("\n═══════════════════════════════════════");
 console.log("  All Days 5–6 AI Tests Passed! ✓");
 console.log("═══════════════════════════════════════");
