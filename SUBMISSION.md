@@ -1,10 +1,9 @@
-# ChargeGuard AI - submission text
+# ChargeGuard AI - Hackathon Submission Text
 
-Paste-ready copy for the hackathon form. Fill the three `TODO` links before submitting.
+Paste-ready copy for the hackathon submission form (e.g. Devpost / Hackathon Dashboard).
 
-- **Live demo:** TODO (Render URL; owner password is in the Render dashboard)
-- **Demo video (YouTube, under 3 min):** TODO
 - **Repo:** https://github.com/PratikSinha123/PAYPAL_HACKTHON (MIT licence)
+- **Note:** Fill the **Live Demo URL** (your Render deployment) and **Demo Video link** (YouTube, under 3 minutes) directly in the respective submission form fields when submitting.
 
 ## Tagline
 Resolve the complaint before it becomes a PayPal dispute. The AI proposes; the owner approves; only then does PayPal get called.
