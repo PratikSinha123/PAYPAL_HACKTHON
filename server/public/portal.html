@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Subscription Portal | ChargeGuard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 antialiased">
+  <div class="max-w-3xl mx-auto px-4 py-8 sm:py-12">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between border-b border-slate-200 pb-5 mb-8">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20 text-lg">
+          CG
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 tracking-tight">Customer Subscription Portal</h1>
+          <p class="text-xs text-slate-500">Secure, passwordless billing & problem resolution</p>
+        </div>
+      </div>
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+        Verified Session
+      </span>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loading" class="text-center py-16">
+      <div class="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <p class="mt-3 text-sm text-slate-500">Loading your subscription details...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-box" class="hidden bg-rose-50 border border-rose-200 rounded-2xl p-6 text-center my-8">
+      <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-3 text-xl font-bold">!</div>
+      <h3 class="text-base font-bold text-rose-900">Session Invalid or Expired</h3>
+      <p class="text-sm text-rose-700 mt-1" id="error-message">This portal link has expired or the token signature is invalid.</p>
+    </div>
+
+    <!-- Main Content -->
+    <main id="portal-content" class="hidden space-y-8">
+
+      <!-- Subscription Overview Card -->
+      <section class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+          <div>
+            <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">Active Plan</span>
+            <h2 class="text-2xl font-extrabold text-slate-900 mt-0.5" id="plan-name">Monthly Pro Plan</h2>
+            <p class="text-xs text-slate-500 mt-0.5 font-mono" id="sub-id">ID: ...</p>
+          </div>
+          <div class="text-left sm:text-right">
+            <span id="sub-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+              ACTIVE
+            </span>
+            <p class="text-xs text-slate-500 mt-1" id="next-billing">Next billing: ...</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 text-sm">
+          <div>
+            <span class="text-xs text-slate-400 block">Subscriber Email</span>
+            <span class="font-semibold text-slate-700 break-all" id="customer-email">...</span>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400 block">Billing Period</span>
+            <span class="font-semibold text-slate-700">Monthly ($9.99 USD)</span>
+          </div>
+          <div class="col-span-2 sm:col-span-1">
+            <span class="text-xs text-slate-400 block">Payment Method</span>
+            <span class="font-semibold text-slate-700 flex items-center">
+              PayPal Auto-Renewal
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Problem Resolution & Deflection Box -->
+      <section class="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-6 border border-blue-100 shadow-sm">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">Having an issue or question?</h3>
+            <p class="text-xs text-slate-600 mt-0.5">
+              Type what happened in plain words below. Our support team and ChargeGuard AI resolve issues immediately without opening formal disputes.
+            </p>
+          </div>
+          <span class="hidden sm:inline-block px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg">
+            Direct Support
+          </span>
+        </div>
+
+        <form id="report-form" class="mt-4">
+          <textarea
+            id="report-message"
+            rows="3"
+            required
+            placeholder="e.g. 'I noticed two $9.99 charges on my account this month, please refund one' or 'Please cancel my upcoming subscription renewal'..."
+            class="w-full bg-white border border-slate-300 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none transition placeholder:text-slate-400"
+          ></textarea>
+          <div class="mt-3 flex items-center justify-between">
+            <span class="text-xs text-slate-500">Typical response time: under 1 hour</span>
+            <button
+              type="submit"
+              id="submit-btn"
+              class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-500/20 transition flex items-center"
+            >
+              <span>Submit Problem Report</span>
+            </button>
+          </div>
+        </form>
+
+        <div id="submit-success" class="hidden mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs">
+          <strong>Report received!</strong> Your complaint is now being triaged by the merchant. You will see their reply in the resolution thread below.
+        </div>
+      </section>
+
+      <!-- Resolution Messages Thread -->
+      <section id="thread-section" class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center justify-between">
+          <span>Resolution & Support Thread</span>
+          <span class="text-xs text-slate-400 font-normal" id="thread-count">0 messages</span>
+        </h3>
+
+        <div id="thread-list" class="space-y-3">
+          <!-- Dynamically populated messages -->
+          <div class="text-center py-6 text-slate-400 text-xs">
+            No support cases or messages yet. All clear!
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent Transactions -->
+      <section class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+        <h3 class="text-base font-bold text-slate-900 mb-4">Payment History</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-slate-100 text-slate-400 uppercase tracking-wider font-semibold">
+                <th class="pb-3">Sale ID</th>
+                <th class="pb-3">Date</th>
+                <th class="pb-3">Amount</th>
+                <th class="pb-3">Status</th>
+              </tr>
+            </thead>
+            <tbody id="tx-tbody" class="divide-y divide-slate-100">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="mt-12 text-center text-xs text-slate-400">
+      Protected by <strong class="text-slate-600">ChargeGuard AI</strong> &bull; Powered by PayPal Platform
+    </footer>
+
+  </div>
+
+  <script>
+    const token = window.location.pathname.split("/").filter(Boolean).pop();
+
+    async function loadPortal() {
+      try {
+        const res = await fetch(`/api/portal/${token}`);
+        if (!res.ok) {
+          throw new Error(res.status === 403 ? "This portal link is invalid or has expired." : "Failed to load portal data.");
+        }
+        const data = await res.json();
+        renderPortal(data);
+      } catch (err) {
+        document.getElementById("loading").classList.add("hidden");
+        document.getElementById("error-box").classList.remove("hidden");
+        document.getElementById("error-message").textContent = err.message;
+      }
+    }
+
+    function renderPortal(data) {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("portal-content").classList.remove("hidden");
+
+      const sub = data.subscription || {};
+      document.getElementById("sub-id").textContent = `ID: ${sub.paypal_subscription_id || 'N/A'}`;
+      document.getElementById("customer-email").textContent = sub.customer_email || 'N/A';
+      document.getElementById("sub-status").textContent = sub.status || 'ACTIVE';
+      document.getElementById("next-billing").textContent = sub.next_billing 
+        ? `Next billing: ${new Date(sub.next_billing).toLocaleDateString()}` 
+        : 'Next billing: Continuous Monthly';
+
+      // Render Transactions
+      const txBody = document.getElementById("tx-tbody");
+      if (data.transactions && data.transactions.length > 0) {
+        txBody.innerHTML = data.transactions.map(t => `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 font-mono text-slate-700 font-medium">${t.paypal_sale_id}</td>
+            <td class="py-3 text-slate-500">${new Date(t.created_at).toLocaleString()}</td>
+            <td class="py-3 font-semibold text-slate-800">$${Number(t.amount).toFixed(2)} ${t.currency || 'USD'}</td>
+            <td class="py-3">
+              <span class="inline-block px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
+                t.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 
+                t.status === 'refunded' ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800'
+              }">${t.status}</span>
+            </td>
+          </tr>
+        `).join("");
+      } else {
+        txBody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-400">No transactions recorded yet.</td></tr>`;
+      }
+
+      // Render Messages
+      const threadList = document.getElementById("thread-list");
+      const messages = data.messages || [];
+      document.getElementById("thread-count").textContent = `${messages.length} message${messages.length === 1 ? '' : 's'}`;
+
+      if (messages.length > 0) {
+        threadList.innerHTML = messages.map(m => {
+          const isCustomer = m.direction === 'in';
+          return `
+            <div class="flex flex-col ${isCustomer ? 'items-end' : 'items-start'}">
+              <div class="flex items-center space-x-2 mb-1">
+                <span class="text-[11px] font-semibold text-slate-500">${isCustomer ? 'You (Customer)' : 'Merchant Support'}</span>
+                <span class="text-[10px] text-slate-400">${new Date(m.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div class="p-3.5 rounded-2xl max-w-lg text-xs leading-relaxed shadow-sm ${
+                isCustomer 
+                  ? 'bg-blue-600 text-white rounded-tr-none' 
+                  : 'bg-slate-100 text-slate-800 border border-slate-200 rounded-tl-none'
+              }">
+                ${m.body}
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
+
+    // Handle Form Submit
+    document.getElementById("report-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("submit-btn");
+      const input = document.getElementById("report-message");
+      const message = input.value.trim();
+      if (!message) return;
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span> Submitting...`;
+
+      try {
+        const res = await fetch(`/portal/${token}/report`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+        if (!res.ok) throw new Error("Failed to submit message");
+
+        input.value = "";
+        document.getElementById("submit-success").classList.remove("hidden");
+        setTimeout(() => {
+          document.getElementById("submit-success").classList.add("hidden");
+        }, 5000);
+
+        // Reload data after brief delay to show new message & AI reply
+        setTimeout(loadPortal, 1200);
+      } catch (err) {
+        alert("Error: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Submit Problem Report</span>`;
+      }
+    });
+
+    loadPortal();
+  </script>
+</body>
+</html>

@@ -1,18 +1,28 @@
 import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import dotenv from "dotenv";
 dotenv.config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
 import Fastify from "fastify";
+import fastifyStatic from "@fastify/static";
 import { openDb, storeEvent } from "./db.js";
 import { verifyWebhook } from "./paypal.js";
 import { dispatch } from "./dispatcher.js";
 import { openCustomerCase, getCaseDetail, approveAction, rejectAction } from "./case-engine.js";
 import { executeAction } from "./executor.js";
 import { generatePortalToken, verifyPortalToken, getPortalData } from "./portal.js";
-import { caseQueue, findDuplicateCharges, dunningCandidates } from "./rules.js";
+import { caseQueue, findDuplicateCharges, dunningCandidates, recoveryLedger } from "./rules.js";
 import { processCase } from "./ai-jobs.js";
 
 const db = openDb();
 const app = Fastify({ logger: true });
+
+/* ───── Static files ───── */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+app.register(fastifyStatic, {
+  root: join(__dirname, "..", "public"),
+  prefix: "/",
+});
 
 /* ───── CORS ───── */
 app.addHook("preHandler", async (req, reply) => {
@@ -51,12 +61,6 @@ app.post("/webhooks/paypal", async (req, reply) => {
 app.get("/health", async () => ({ ok: true }));
 
 /* ───── Portal routes ───── */
-app.get("/portal/:token", async (req, reply) => {
-  const { token } = req.params as { token: string };
-  const sub = verifyPortalToken(token);
-  if (!sub) return reply.code(403).send({ error: "invalid token" });
-  return getPortalData(db, sub);
-});
 
 app.post("/portal/:token/report", async (req, reply) => {
   const { token } = req.params as { token: string };
@@ -122,10 +126,36 @@ app.get("/api/rules/dunning", async (req, reply) => {
   return dunningCandidates(db);
 });
 
+app.get("/api/ledger", async (req, reply) => {
+  return recoveryLedger(db);
+});
+
 app.post("/api/portal-token", async (req, reply) => {
   if (!ownerGuard(req)) return reply.code(401).send({ error: "unauthorized" });
   const { subscription_id } = req.body as { subscription_id: string };
   return { token: generatePortalToken(subscription_id) };
+});
+
+/* ───── Portal API routes (with /api/ prefix for frontend) ───── */
+app.get("/api/portal/:token", async (req, reply) => {
+  const { token } = req.params as { token: string };
+  const sub = verifyPortalToken(token);
+  if (!sub) return reply.code(403).send({ error: "invalid token" });
+  return getPortalData(db, sub);
+});
+
+/* ───── Portal HTML page (serves portal.html for browser visits) ───── */
+app.get("/portal/:token", async (req, reply) => {
+  const accept = req.headers.accept || "";
+  // If it's a JSON API call, return data
+  if (accept.includes("application/json") && !accept.includes("text/html")) {
+    const { token } = req.params as { token: string };
+    const sub = verifyPortalToken(token);
+    if (!sub) return reply.code(403).send({ error: "invalid token" });
+    return getPortalData(db, sub);
+  }
+  // Otherwise serve the portal HTML page
+  return reply.sendFile("portal.html");
 });
 
 /* ───── Startup: Auto-advance stranded intake cases ───── */

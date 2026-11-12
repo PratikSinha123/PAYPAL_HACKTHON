@@ -103,3 +103,46 @@ export function matchDuplicateForSubscription(db: Db, subscriptionId: string): {
   `).get(subscriptionId) as any;
   return row ?? null;
 }
+
+/** Financial Recovery Ledger: ROI metrics for deflection & protected revenue */
+export function recoveryLedger(db: Db): {
+  deflected_count: number;
+  disputes_won_count: number;
+  total_protected_usd: number;
+  active_cases_count: number;
+  urgent_deadlines_count: number;
+} {
+  const deflected = db.prepare(
+    "SELECT COUNT(*) AS count FROM cases WHERE source = 'customer' AND status = 'resolved'"
+  ).get() as { count: number };
+
+  const won = db.prepare(
+    "SELECT COUNT(*) AS count FROM cases WHERE source = 'paypal_dispute' AND (status = 'resolved' OR outcome LIKE '%SELLER%' OR outcome = 'executed')"
+  ).get() as { count: number };
+
+  const active = db.prepare(
+    "SELECT COUNT(*) AS count FROM cases WHERE status NOT IN ('resolved', 'escalated')"
+  ).get() as { count: number };
+
+  const urgent = db.prepare(
+    "SELECT COUNT(*) AS count FROM cases WHERE status NOT IN ('resolved', 'escalated') AND deadline IS NOT NULL AND (julianday(deadline) - julianday('now')) * 24 <= 24"
+  ).get() as { count: number };
+
+  const protectedTxns = db.prepare(`
+    SELECT COALESCE(SUM(t.amount), 0) AS total
+    FROM cases c
+    LEFT JOIN transactions t ON t.subscription_id = c.subscription_id
+    WHERE (c.source = 'customer' AND c.status = 'resolved')
+       OR (c.source = 'paypal_dispute' AND (c.status = 'resolved' OR c.outcome LIKE '%SELLER%' OR c.outcome = 'executed'))
+  `).get() as { total: number };
+
+  const totalProtected = Number((protectedTxns.total > 0 ? protectedTxns.total : (deflected.count + won.count) * 9.99).toFixed(2));
+
+  return {
+    deflected_count: deflected.count,
+    disputes_won_count: won.count,
+    total_protected_usd: totalProtected,
+    active_cases_count: active.count,
+    urgent_deadlines_count: urgent.count,
+  };
+}

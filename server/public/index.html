@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChargeGuard AI — Owner Dashboard & Recovery Ledger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen antialiased flex flex-col">
+
+  <!-- Top Navbar -->
+  <header class="bg-slate-950 border-b border-slate-800 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-blue-500/20">
+        CG
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-lg font-bold text-white tracking-tight">ChargeGuard AI</h1>
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">HACKATHON EDITION</span>
+        </div>
+        <p class="text-xs text-slate-400">Pre-Dispute Deflection & Autonomous Case Engine</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-4 text-xs">
+      <div class="hidden md:flex items-center space-x-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-slate-300 font-medium">PayPal Sandbox Connected</span>
+      </div>
+      <div class="hidden sm:flex items-center space-x-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+        <span class="text-slate-400">Approval Gate:</span>
+        <span class="text-amber-400 font-semibold">Human-Enforced</span>
+      </div>
+      <button onclick="openPortalModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg shadow-sm transition">
+        + Portal Link Generator
+      </button>
+    </div>
+  </header>
+
+  <!-- Recovery Ledger & KPI Row (Day 9 Deliverable) -->
+  <section class="bg-slate-950/60 border-b border-slate-800/80 px-6 py-5">
+    <div class="max-w-7xl mx-auto">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold text-slate-400 tracking-wider uppercase flex items-center">
+          <svg class="w-4 h-4 mr-1 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+          Financial Recovery & Deflection Ledger
+        </span>
+        <span class="text-[11px] text-slate-500">Live ROI Metrics &bull; Measured against PayPal Sandbox</span>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- Card 1: Protected Dollars -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="absolute right-0 top-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl"></div>
+          <span class="text-xs text-slate-400 font-medium">Revenue Protected</span>
+          <div class="text-2xl font-extrabold text-white mt-1" id="kpi-revenue">$0.00</div>
+          <span class="inline-flex items-center text-[10px] text-emerald-400 font-semibold mt-1">
+            +100% Retained &bull; Zero Chargeback Fees
+          </span>
+        </div>
+
+        <!-- Card 2: Deflected Inquiries -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="absolute right-0 top-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl"></div>
+          <span class="text-xs text-slate-400 font-medium">Deflected Cases</span>
+          <div class="text-2xl font-extrabold text-blue-400 mt-1" id="kpi-deflected">0</div>
+          <span class="text-[10px] text-slate-400 mt-1 block">Resolved before PayPal dispute opened</span>
+        </div>
+
+        <!-- Card 3: Disputes Won -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="absolute right-0 top-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl"></div>
+          <span class="text-xs text-slate-400 font-medium">Disputes Defended / Won</span>
+          <div class="text-2xl font-extrabold text-indigo-300 mt-1" id="kpi-disputes">0</div>
+          <span class="text-[10px] text-slate-400 mt-1 block">Structured evidence representment</span>
+        </div>
+
+        <!-- Card 4: Urgent Deadlines -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="absolute right-0 top-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl"></div>
+          <span class="text-xs text-slate-400 font-medium">Urgent Deadlines (&lt;24h)</span>
+          <div class="text-2xl font-extrabold text-amber-400 mt-1" id="kpi-urgent">0</div>
+          <span class="text-[10px] text-slate-400 mt-1 block">Priority sorted by countdown clock</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- Left Column: Priority Case Queue (5 Cols) -->
+    <div class="lg:col-span-5 bg-slate-950/80 border border-slate-800 rounded-2xl flex flex-col h-[750px] shadow-xl overflow-hidden">
+      <!-- Queue Header -->
+      <div class="p-4 border-b border-slate-800 bg-slate-950/90">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-white flex items-center">
+            <span>Priority Case Queue</span>
+            <span id="queue-badge" class="ml-2 px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-300">0</span>
+          </h2>
+          <button onclick="refreshData()" class="text-xs text-blue-400 hover:text-blue-300 flex items-center">
+            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Refresh
+          </button>
+        </div>
+
+        <!-- Filter tabs -->
+        <div class="flex items-center space-x-2 mt-3 text-xs">
+          <button onclick="setFilter('all')" id="tab-all" class="px-2.5 py-1 rounded-md bg-blue-600 text-white font-medium">All</button>
+          <button onclick="setFilter('urgent')" id="tab-urgent" class="px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 hover:text-white">Urgent</button>
+          <button onclick="setFilter('customer')" id="tab-customer" class="px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 hover:text-white">Inquiries</button>
+          <button onclick="setFilter('dispute')" id="tab-dispute" class="px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 hover:text-white">PayPal Disputes</button>
+        </div>
+      </div>
+
+      <!-- Queue List -->
+      <div id="case-list" class="flex-1 overflow-y-auto custom-scroll divide-y divide-slate-800/60 p-2 space-y-1">
+        <div class="p-8 text-center text-slate-500 text-xs">
+          Loading cases...
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Case Deep Inspector & Approval Gate (7 Cols) -->
+    <div class="lg:col-span-7 bg-slate-950/80 border border-slate-800 rounded-2xl flex flex-col h-[750px] shadow-xl overflow-hidden">
+      <!-- Empty state -->
+      <div id="no-case-selected" class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+        <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-600 text-2xl mb-3">
+          📋
+        </div>
+        <h3 class="text-base font-bold text-slate-300">No Case Selected</h3>
+        <p class="text-xs text-slate-500 max-w-sm mt-1">Select any case from the priority queue to inspect its AI triage, evidence checklist, and proposed action.</p>
+      </div>
+
+      <!-- Detail View -->
+      <div id="case-detail" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+
+        <!-- Case Header -->
+        <div class="p-5 border-b border-slate-800 bg-slate-950 flex items-start justify-between">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-base font-extrabold text-white" id="detail-title">Case #1</span>
+              <span id="detail-status-badge" class="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                awaiting_approval
+              </span>
+              <span id="detail-reason-badge" class="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                DUPLICATE
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">
+              Subscription: <span id="detail-sub-id" class="font-mono text-slate-300">...</span> &bull; 
+              Payer: <span id="detail-customer-email" class="text-slate-300">...</span>
+            </p>
+          </div>
+
+          <div class="text-right">
+            <div id="detail-deadline-badge" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300">
+              No Deadline
+            </div>
+          </div>
+        </div>
+
+        <!-- Scrollable Inspector Body -->
+        <div class="flex-1 overflow-y-auto custom-scroll p-6 space-y-6">
+
+          <!-- 1. AI Triage Card (Job 1) -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center">
+                🤖 AI Job 1: Intake Triage
+              </span>
+              <span id="triage-urgency" class="text-[11px] px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-300">URGENCY: NORMAL</span>
+            </div>
+            <p id="triage-summary" class="text-sm font-semibold text-slate-200 mt-1">Loading summary...</p>
+            <div class="flex items-center space-x-4 mt-3 text-xs text-slate-400 border-t border-slate-800/80 pt-2.5">
+              <span>Remedy Sought: <strong class="text-slate-200" id="triage-remedy">REFUND</strong></span>
+              <span>Target Sale: <strong class="text-slate-200 font-mono" id="triage-sale">...</strong></span>
+            </div>
+          </div>
+
+          <!-- 2. Factual Evidence Checklist (Job 2) -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center">
+                  📑 AI Job 2: Evidence Assessment
+                </span>
+                <span class="text-[11px] text-slate-400">Strictly factual verification (no synthetic win probabilities)</span>
+              </div>
+              <span id="evidence-strength-badge" class="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Strength: 4 of 5
+              </span>
+            </div>
+
+            <!-- Evidence Checklist List -->
+            <ul id="evidence-checklist" class="space-y-2 text-xs">
+              <!-- Dynamically populated -->
+            </ul>
+
+            <div class="mt-3 p-3 bg-slate-950/60 rounded-lg border border-slate-800/80 text-xs text-slate-400 italic" id="evidence-rationale">
+              ...
+            </div>
+          </div>
+
+          <!-- 3. Customer Grievance & Thread -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Customer Statement & Communication Thread</h4>
+            <div id="case-messages" class="space-y-2.5 text-xs max-h-48 overflow-y-auto custom-scroll">
+              <!-- Messages -->
+            </div>
+          </div>
+
+          <!-- 4. The Approval Gate & Proposed Action (Job 3) -->
+          <div class="bg-gradient-to-br from-blue-950/40 via-indigo-950/30 to-slate-900 border-2 border-blue-500/40 rounded-xl p-5 relative overflow-hidden shadow-lg">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+                <h4 class="text-sm font-bold text-white tracking-tight">The Approval Gate</h4>
+              </div>
+              <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Action Pending Approval
+              </span>
+            </div>
+            <p class="text-xs text-slate-300">
+              The AI proposes; a human owner approves. <strong>No PayPal write endpoint is ever executed autonomously.</strong>
+            </p>
+
+            <!-- Proposed Action Details -->
+            <div class="mt-3 p-3 bg-slate-950/80 rounded-lg border border-slate-800 text-xs space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Proposed Action:</span>
+                <span id="action-type" class="font-bold font-mono text-emerald-400">ISSUE_REFUND</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">Payload Parameters:</span>
+                <span id="action-payload" class="font-mono text-slate-300 break-all">...</span>
+              </div>
+              <div class="pt-1 text-slate-400 text-[11px]" id="action-reasoning">
+                ...
+              </div>
+            </div>
+
+            <!-- Draft Reply Editor -->
+            <div class="mt-3">
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-xs font-semibold text-slate-300">AI Drafted Customer Resolution Message</label>
+                <div class="flex items-center space-x-1.5 text-[11px]">
+                  <span class="text-slate-500">Tone:</span>
+                  <select id="tone-select" onchange="regenerateDraft()" class="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-300 text-xs">
+                    <option value="conciliatory">Conciliatory & Friendly</option>
+                    <option value="professional" selected>Professional</option>
+                    <option value="firm">Firm Legal / Formal</option>
+                  </select>
+                </div>
+              </div>
+              <textarea id="draft-message-text" rows="3" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:border-blue-500 transition"></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-4 flex items-center justify-between pt-2 border-t border-slate-800">
+              <button onclick="rejectCurrentAction()" class="px-3.5 py-2 bg-slate-800 hover:bg-rose-900/50 hover:text-rose-200 text-slate-400 font-semibold text-xs rounded-lg transition">
+                Reject Action
+              </button>
+              <div class="flex items-center space-x-2">
+                <button onclick="reprocessCurrentCase()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-lg transition">
+                  Re-run AI
+                </button>
+                <button onclick="approveCurrentAction()" id="approve-btn" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-lg shadow-emerald-600/30 transition flex items-center">
+                  <span>Approve & Execute via PayPal &rarr;</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Portal Link Modal -->
+  <div id="portal-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-sm font-bold text-white">Generate Customer Portal Link</h3>
+        <button onclick="closePortalModal()" class="text-slate-500 hover:text-white">&times;</button>
+      </div>
+
+      <div class="mt-4 space-y-3">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Select Subscription ID</label>
+          <input type="text" id="modal-sub-id" value="I-BN5BHFNLUH49" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs font-mono text-slate-200 outline-none">
+        </div>
+
+        <button onclick="generatePortalLinkAction()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-lg transition">
+          Generate Tokenized Magic Link
+        </button>
+
+        <div id="modal-result" class="hidden mt-3 p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2">
+          <span class="text-[11px] text-slate-400 block">Generated Portal URL:</span>
+          <a id="modal-link" href="#" target="_blank" class="text-xs font-mono text-blue-400 hover:underline break-all block">...</a>
+          <button onclick="window.open(document.getElementById('modal-link').href, '_blank')" class="w-full py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded transition mt-1">
+            Open Portal &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let cases = [];
+    let activeCaseId = null;
+    let currentFilter = 'all';
+
+    async function fetchLedger() {
+      try {
+        const res = await fetch('/api/ledger');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('kpi-revenue').textContent = `$${Number(data.total_protected_usd || 0).toFixed(2)}`;
+        document.getElementById('kpi-deflected').textContent = data.deflected_count || 0;
+        document.getElementById('kpi-disputes').textContent = data.disputes_won_count || 0;
+        document.getElementById('kpi-urgent').textContent = data.urgent_deadlines_count || 0;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadCases() {
+      try {
+        const res = await fetch('/api/cases', {
+          headers: { 'x-owner-password': 'change-me' }
+        });
+        if (!res.ok) throw new Error('Failed to load cases');
+        cases = await res.json();
+        renderQueue();
+      } catch (e) {
+        document.getElementById('case-list').innerHTML = `<div class="p-6 text-center text-rose-400 text-xs">Error: ${e.message}</div>`;
+      }
+    }
+
+    function setFilter(f) {
+      currentFilter = f;
+      ['all', 'urgent', 'customer', 'dispute'].forEach(name => {
+        const btn = document.getElementById(`tab-${name}`);
+        if (name === f) {
+          btn.className = "px-2.5 py-1 rounded-md bg-blue-600 text-white font-medium";
+        } else {
+          btn.className = "px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 hover:text-white";
+        }
+      });
+      renderQueue();
+    }
+
+    function renderQueue() {
+      const container = document.getElementById('case-list');
+      let filtered = cases;
+      if (currentFilter === 'urgent') filtered = cases.filter(c => c.is_urgent === 1 || c.deadline_status === 'urgent');
+      else if (currentFilter === 'customer') filtered = cases.filter(c => c.source === 'customer');
+      else if (currentFilter === 'dispute') filtered = cases.filter(c => c.source === 'paypal_dispute');
+
+      document.getElementById('queue-badge').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="p-8 text-center text-slate-500 text-xs">No cases matching filter.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(c => {
+        const isSelected = c.id === activeCaseId;
+        const isUrgent = c.is_urgent === 1 || c.deadline_status === 'urgent';
+        const isOverdue = c.is_overdue === 1 || c.deadline_status === 'overdue';
+
+        return `
+          <div onclick="selectCase(${c.id})" class="p-3.5 rounded-xl cursor-pointer transition ${
+            isSelected 
+              ? 'bg-blue-950/60 border border-blue-500/40 shadow-sm' 
+              : 'hover:bg-slate-900 border border-transparent'
+          }">
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center space-x-1.5">
+                <span class="text-xs font-bold text-white">Case #${c.id}</span>
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  c.reason_code === 'DUPLICATE' ? 'bg-amber-500/20 text-amber-300' :
+                  c.reason_code === 'SNAD' ? 'bg-indigo-500/20 text-indigo-300' :
+                  c.reason_code === 'INR' ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-700 text-slate-300'
+                }">${c.reason_code || 'UNCLASSIFIED'}</span>
+              </div>
+              <div>
+                ${isOverdue ? '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/30">OVERDUE</span>' :
+                  isUrgent ? `<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">URGENT ${c.hours_remaining}h</span>` :
+                  c.deadline ? `<span class="px-1.5 py-0.5 rounded text-[10px] text-slate-400 font-mono">${Math.round(c.hours_remaining/24)}d left</span>` :
+                  '<span class="text-[10px] text-slate-500">Inquiry</span>'
+                }
+              </div>
+            </div>
+
+            <div class="text-[11px] text-slate-400 truncate">
+              Sub: <span class="font-mono text-slate-300">${c.subscription_id || 'N/A'}</span>
+            </div>
+
+            <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-800/60 text-[10px] text-slate-500">
+              <span class="uppercase font-semibold tracking-wider ${
+                c.status === 'awaiting_approval' ? 'text-amber-400' :
+                c.status === 'resolved' ? 'text-emerald-400' : 'text-slate-400'
+              }">${c.status.replace('_', ' ')}</span>
+              <span>${c.source === 'customer' ? 'Customer Portal' : 'PayPal Dispute'}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function selectCase(id) {
+      activeCaseId = id;
+      renderQueue();
+
+      document.getElementById('no-case-selected').classList.add('hidden');
+      document.getElementById('case-detail').classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/cases/${id}`, {
+          headers: { 'x-owner-password': 'change-me' }
+        });
+        if (!res.ok) throw new Error('Failed to load case detail');
+        const detail = await res.json();
+        renderCaseDetail(detail);
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    function renderCaseDetail(d) {
+      document.getElementById('detail-title').textContent = `Case #${d.id}`;
+      document.getElementById('detail-sub-id').textContent = d.subscription_id || 'N/A';
+      document.getElementById('detail-customer-email').textContent = d.subscription?.customer_email || 'Customer';
+
+      document.getElementById('detail-status-badge').textContent = d.status;
+      document.getElementById('detail-reason-badge').textContent = d.reason_code || 'UNCLASSIFIED';
+
+      // Deadline badge
+      const dBadge = document.getElementById('detail-deadline-badge');
+      if (d.deadline) {
+        const isUrgent = d.is_urgent === 1 || d.deadline_status === 'urgent';
+        dBadge.className = isUrgent 
+          ? "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+          : "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300";
+        dBadge.textContent = `Seller Due Date: ${new Date(d.deadline).toLocaleDateString()} (${d.hours_remaining}h remaining)`;
+      } else {
+        dBadge.className = "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-400";
+        dBadge.textContent = "Pre-Dispute Inquiry (No PayPal Deadline)";
+      }
+
+      // Triage info
+      document.getElementById('triage-summary').textContent = d.messages?.[0]?.body || 'Customer initiated dispute inquiry.';
+      document.getElementById('triage-remedy').textContent = d.reason_code === 'DUPLICATE' ? 'REFUND' : 'EXPLANATION & RESOLUTION';
+      document.getElementById('triage-sale').textContent = d.transactions?.[0]?.paypal_sale_id || 'N/A';
+
+      // Evidence Checklist
+      const eList = document.getElementById('evidence-checklist');
+      const items = d.evidence || [];
+      const presentCount = items.filter(e => e.present === 1).length;
+      document.getElementById('evidence-strength-badge').textContent = `Strength: ${presentCount} of ${items.length || 1}`;
+
+      if (items.length > 0) {
+        eList.innerHTML = items.map(e => `
+          <li class="flex items-start justify-between p-2 rounded-lg bg-slate-950/40 border border-slate-800/80">
+            <span class="flex items-center">
+              ${e.present === 1 
+                ? '<span class="text-emerald-400 mr-2 font-bold">✓</span>' 
+                : '<span class="text-amber-400 mr-2 font-bold">⚠</span>'}
+              <span class="${e.present === 1 ? 'text-slate-200' : 'text-slate-400'}">${e.label}</span>
+            </span>
+            <span class="font-mono text-[10px] ${e.present === 1 ? 'text-emerald-400' : 'text-amber-400'}">
+              ${e.present === 1 ? 'VERIFIED' : 'MISSING'}
+            </span>
+          </li>
+        `).join("");
+      } else {
+        eList.innerHTML = `<li class="text-slate-500 text-xs">Run AI Pipeline to assemble evidence checklist.</li>`;
+      }
+
+      // Customer Thread
+      const msgContainer = document.getElementById('case-messages');
+      const msgs = d.messages || [];
+      if (msgs.length > 0) {
+        msgContainer.innerHTML = msgs.map(m => `
+          <div class="p-2.5 rounded-lg ${m.direction === 'in' ? 'bg-slate-950 border border-slate-800 text-slate-200' : 'bg-blue-950/40 border border-blue-900/50 text-blue-200'}">
+            <div class="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+              <span>${m.direction === 'in' ? 'Customer' : 'Merchant / AI Draft'}</span>
+              <span>${new Date(m.sent_at).toLocaleTimeString()}</span>
+            </div>
+            <div>${m.body}</div>
+          </div>
+        `).join("");
+      } else {
+        msgContainer.innerHTML = `<div class="text-slate-500">No message thread history.</div>`;
+      }
+
+      // Actions Card
+      const latestAction = d.actions?.[0];
+      if (latestAction) {
+        document.getElementById('action-type').textContent = latestAction.type;
+        document.getElementById('action-payload').textContent = latestAction.payload || '{}';
+        document.getElementById('action-reasoning').textContent = `Status: ${latestAction.status.toUpperCase()} &bull; Proposed by: ${latestAction.proposed_by}`;
+        
+        // Populate draft textarea with previous out message or generated action
+        const outMsg = msgs.find(m => m.direction === 'out');
+        document.getElementById('draft-message-text').value = outMsg ? outMsg.body : 'We have investigated your transaction and processed the resolution directly through your PayPal billing agreement.';
+      } else {
+        document.getElementById('action-type').textContent = "NO_ACTION_PENDING";
+        document.getElementById('action-payload').textContent = "Click 'Re-run AI' to propose action";
+      }
+    }
+
+    async function approveCurrentAction() {
+      if (!activeCaseId) return;
+      const btn = document.getElementById('approve-btn');
+      btn.disabled = true;
+      btn.innerHTML = `<span>Executing PayPal API...</span>`;
+
+      try {
+        const caseRes = await fetch(`/api/cases/${activeCaseId}`, { headers: { 'x-owner-password': 'change-me' } });
+        const d = await caseRes.json();
+        const action = d.actions?.[0];
+        if (!action) throw new Error("No pending action on this case");
+
+        const res = await fetch(`/api/actions/${action.id}/approve`, {
+          method: 'POST',
+          headers: { 'x-owner-password': 'change-me' }
+        });
+        if (!res.ok) throw new Error("Approval failed");
+
+        alert("Action approved! ChargeGuard executed the call directly against PayPal.");
+        await refreshData();
+        await selectCase(activeCaseId);
+      } catch (e) {
+        alert("Execution Error: " + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Approve & Execute via PayPal &rarr;</span>`;
+      }
+    }
+
+    async function rejectCurrentAction() {
+      if (!activeCaseId) return;
+      if (!confirm("Reject this proposed action?")) return;
+
+      try {
+        const caseRes = await fetch(`/api/cases/${activeCaseId}`, { headers: { 'x-owner-password': 'change-me' } });
+        const d = await caseRes.json();
+        const action = d.actions?.[0];
+        if (!action) throw new Error("No pending action");
+
+        await fetch(`/api/actions/${action.id}/reject`, {
+          method: 'POST',
+          headers: { 'x-owner-password': 'change-me' }
+        });
+
+        alert("Action rejected.");
+        await refreshData();
+        await selectCase(activeCaseId);
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    async function reprocessCurrentCase() {
+      if (!activeCaseId) return;
+      try {
+        const res = await fetch(`/api/cases/${activeCaseId}/process`, {
+          method: 'POST',
+          headers: { 'x-owner-password': 'change-me' }
+        });
+        if (!res.ok) throw new Error("Failed to run AI pipeline");
+        alert("AI Pipeline executed! Triage, evidence, and draft updated.");
+        await refreshData();
+        await selectCase(activeCaseId);
+      } catch (e) {
+        alert("Error: " + e.message);
+      }
+    }
+
+    async function regenerateDraft() {
+      // Re-run AI pipeline with updated tone when tone dropdown changes
+      if (!activeCaseId) return;
+      await reprocessCurrentCase();
+    }
+
+    async function refreshData() {
+      await fetchLedger();
+      await loadCases();
+    }
+
+    function openPortalModal() {
+      document.getElementById('portal-modal').classList.remove('hidden');
+    }
+    function closePortalModal() {
+      document.getElementById('portal-modal').classList.add('hidden');
+    }
+
+    async function generatePortalLinkAction() {
+      const subId = document.getElementById('modal-sub-id').value.trim();
+      if (!subId) return;
+
+      try {
+        const res = await fetch('/api/portal-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-owner-password': 'change-me' },
+          body: JSON.stringify({ subscription_id: subId })
+        });
+        const data = await res.json();
+        const url = `${window.location.origin}/portal/${data.token}`;
+        document.getElementById('modal-link').href = url;
+        document.getElementById('modal-link').textContent = url;
+        document.getElementById('modal-result').classList.remove('hidden');
+      } catch (e) {
+        alert("Failed to generate link: " + e.message);
+      }
+    }
+
+    // Initial Load
+    refreshData();
+    setInterval(fetchLedger, 10000); // Poll ledger
+  </script>
+</body>
+</html>

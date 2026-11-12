@@ -13,6 +13,7 @@
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {
+    "@fastify/static": "^10.1.10",
     "better-sqlite3": "*",
     "dotenv": "*",
     "fastify": "*",
