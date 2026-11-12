@@ -1,5 +1,8 @@
 // Creates a sandbox product + plan + subscription. The buyer must approve it once in a browser.
 // Run: npm run seed [buyer-email]
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+dotenv.config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) }); // same repo-root .env as the server
 import { openDb } from "./db.js";
 import { paypal } from "./paypal.js";
 
