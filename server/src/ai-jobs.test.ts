@@ -95,7 +95,9 @@ assert.ok(result.actionId > 0, "Action must be enqueued");
 // Verify that the action is strictly pending at the Approval Gate
 const actionRow = db.prepare("SELECT * FROM actions WHERE id = ?").get(result.actionId) as any;
 assert.equal(actionRow.status, "pending", "Action must be pending approval");
-assert.equal(actionRow.proposed_by, "ai");
+// Honest provenance: a live model is "ai"; the keyword fallback must say so.
+const mocked = process.env.AI_MOCK === "true" || !process.env.AI_API_KEY?.trim();
+assert.equal(actionRow.proposed_by, mocked ? "rules-fallback" : "ai");
 console.log("✓ Case halted at 'awaiting_approval' gate; action enqueued as 'pending'");
 
 // Verify owner approval gate transition

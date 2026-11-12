@@ -177,6 +177,18 @@ function generateFallbackJson<T extends z.ZodType>(schema: T, system: string, us
   throw new Error("Unable to generate schema response from fallback generator");
 }
 
+/** Marks a result that came from the keyword-rules fallback instead of a live model (non-enumerable, so equality checks ignore it). */
+const FALLBACK = Symbol("chargeguard.fallback");
+export const isFallback = (v: unknown): boolean => Boolean((v as any)?.[FALLBACK]);
+
+/** The fallback is never silent: it logs why, and the result is marked so the UI can say so. */
+function fallbackWithNotice<T extends z.ZodType>(schema: T, system: string, user: string, why: string): z.infer<T> {
+  console.warn(`[ai] NOT using a live model (${why}); using the deterministic rules fallback`);
+  const out = generateFallbackJson(schema, system, user);
+  Object.defineProperty(out, FALLBACK, { value: true });
+  return out;
+}
+
 /** One call for all three AI jobs: prompt in, zod-validated JSON out. Never free prose. */
 export async function generateJson<T extends z.ZodType>(
   schema: T,
@@ -185,10 +197,10 @@ export async function generateJson<T extends z.ZodType>(
   retries = 1
 ): Promise<z.infer<T>> {
   const apiKey = process.env.AI_API_KEY?.trim();
-  const isMock = process.env.AI_MOCK === "true" || !apiKey || apiKey.startsWith("AQ.") || apiKey === "change-me";
+  const isMock = process.env.AI_MOCK === "true" || !apiKey || apiKey === "change-me";
 
   if (isMock) {
-    return generateFallbackJson(schema, system, user);
+    return fallbackWithNotice(schema, system, user, process.env.AI_MOCK === "true" ? "AI_MOCK=true" : "no AI_API_KEY set");
   }
 
   let lastError: Error | undefined;
@@ -234,8 +246,7 @@ export async function generateJson<T extends z.ZodType>(
     }
 
     if (!RETRYABLE_STATUS.has(r.status)) {
-      console.warn(`ai HTTP ${r.status}: falling back to deterministic generator`);
-      return generateFallbackJson(schema, system, user);
+      return fallbackWithNotice(schema, system, user, `provider returned HTTP ${r.status}: ${(await r.text()).slice(0, 160)}`);
     }
 
     lastError = new Error(`ai ${r.status}: ${await r.text()}`);
@@ -245,6 +256,5 @@ export async function generateJson<T extends z.ZodType>(
     }
   }
 
-  console.warn(`AI request failed (${lastError?.message}); using fallback generator.`);
-  return generateFallbackJson(schema, system, user);
+  return fallbackWithNotice(schema, system, user, `request failed: ${lastError?.message}`);
 }

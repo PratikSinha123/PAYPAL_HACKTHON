@@ -66,7 +66,7 @@ export function getPortalData(db: Db, subscriptionId: string) {
   ).all(subscriptionId) as any[];
   const caseMessages = cases.length > 0
     ? db.prepare(
-        `SELECT m.* FROM messages m JOIN cases c ON m.case_id = c.id WHERE c.subscription_id = ? ORDER BY m.sent_at ASC`
+        `SELECT m.* FROM messages m JOIN cases c ON m.case_id = c.id WHERE c.subscription_id = ? AND m.status = 'sent' ORDER BY m.sent_at ASC`
       ).all(subscriptionId)
     : [];
   return { subscription, transactions, cases, messages: caseMessages };

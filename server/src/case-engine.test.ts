@@ -6,6 +6,7 @@ import {
   advanceCase,
   proposeAction,
   approveAction,
+  applyOwnerEdit,
   rejectAction,
   getCaseDetail,
   addEvidence,
@@ -281,6 +282,27 @@ assert.ok(real, "UPDATED alone must create the case");
 assert.equal(real.deadline, "2099-01-01T00:00:00.000Z");
 assert.notEqual(real.status, "escalated");
 assert.ok(caseQueue(db).some((c) => c.id === real.id), "chargeback case must stay in the queue");
+
+// Owner edit travels with the approval: the edited text is what is sent and what the thread shows.
+const oc = openCustomerCase(db, "I-SUB001", "edit test");
+addMessage(db, oc, "out", "AI draft", "draft");
+const oa = proposeAction(db, oc, "SEND_BUYER_MESSAGE", { message: "AI draft" });
+applyOwnerEdit(db, oa, "  Edited by the owner  ");
+assert.equal(JSON.parse((db.prepare("SELECT payload FROM actions WHERE id = ?").get(oa) as any).payload).message, "Edited by the owner");
+assert.equal((db.prepare("SELECT body FROM messages WHERE case_id = ? AND direction = 'out'").get(oc) as any).body, "Edited by the owner");
+assert.throws(() => applyOwnerEdit(db, oa, "   "), /1-2000/);
+approveAction(db, oa);
+assert.throws(() => applyOwnerEdit(db, oa, "too late"), /not pending/);
+console.log("✓ owner edit applies while pending and is frozen after approval");
+
+// Draft leak: an unapproved draft is invisible to the customer; it appears only when published.
+const dc = openCustomerCase(db, "I-SUB001", "draft leak test");
+addMessage(db, dc, "out", "UNAPPROVED DRAFT", "draft");
+assert.ok(!getPortalData(db, "I-SUB001").messages.some((m: any) => m.body === "UNAPPROVED DRAFT"), "customer must not see a draft");
+assert.ok(getCaseDetail(db, dc)!.messages.some((m: any) => m.body === "UNAPPROVED DRAFT" && m.status === "draft"), "owner sees the draft");
+db.prepare("UPDATE messages SET status = 'sent' WHERE body = 'UNAPPROVED DRAFT'").run();
+assert.ok(getPortalData(db, "I-SUB001").messages.some((m: any) => m.body === "UNAPPROVED DRAFT"), "published message is visible");
+console.log("✓ drafts are hidden from the customer until published");
 
 console.log("\n═══════════════════════════════════════");
 console.log("  All Day 3–4 + Day 4 Gap Tests Passed! ✓");

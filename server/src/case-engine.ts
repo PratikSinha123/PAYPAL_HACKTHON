@@ -145,6 +145,25 @@ export function approveAction(db: Db, actionId: number, approvedBy = "owner"): v
   db.prepare("UPDATE actions SET status = 'approved', approved_by = ? WHERE id = ?").run(approvedBy, actionId);
 }
 
+/**
+ * Owner edit made in the same click that approves. Only while pending. The edited text becomes what is
+ * sent: the payload field the executor reads, and the reply shown in the thread.
+ */
+export function applyOwnerEdit(db: Db, actionId: number, message: string): void {
+  const a = db.prepare("SELECT case_id, type, status, payload FROM actions WHERE id = ?").get(actionId) as any;
+  if (!a) throw new Error(`action ${actionId} not found`);
+  if (a.status !== "pending") throw new Error(`action ${actionId} is ${a.status}, not pending`);
+  const text = String(message ?? "").trim();
+  if (!text || text.length > 2000) throw new Error("message must be 1-2000 characters");
+  const payload = JSON.parse(a.payload || "{}");
+  if (a.type === "SEND_BUYER_MESSAGE") payload.message = text;
+  else if (["ISSUE_REFUND", "MAKE_OFFER", "ACCEPT_CLAIM"].includes(a.type)) payload.note = text;
+  db.prepare("UPDATE actions SET payload = ? WHERE id = ?").run(JSON.stringify(validateActionPayload(db, a.case_id, a.type, payload)), actionId);
+  const m = db.prepare("SELECT id FROM messages WHERE case_id = ? AND direction = 'out' AND status = 'draft' ORDER BY id DESC LIMIT 1").get(a.case_id) as any;
+  if (m) db.prepare("UPDATE messages SET body = ? WHERE id = ?").run(text, m.id);
+  else addMessage(db, a.case_id, "out", text, "draft");
+}
+
 /** Reject an action */
 export function rejectAction(db: Db, actionId: number): void {
   const action = db.prepare("SELECT status FROM actions WHERE id = ?").get(actionId) as any;
@@ -219,9 +238,9 @@ export function addEvidence(
 }
 
 /** Store a message on a case thread */
-export function addMessage(db: Db, caseId: number, direction: "in" | "out", body: string): number {
+export function addMessage(db: Db, caseId: number, direction: "in" | "out", body: string, status: "sent" | "draft" = "sent"): number {
   const result = db.prepare(
-    "INSERT INTO messages (case_id, direction, body) VALUES (?, ?, ?)"
-  ).run(caseId, direction, body);
+    "INSERT INTO messages (case_id, direction, body, status) VALUES (?, ?, ?, ?)"
+  ).run(caseId, direction, body, status);
   return Number(result.lastInsertRowid);
 }

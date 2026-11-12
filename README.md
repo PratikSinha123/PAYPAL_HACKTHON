@@ -119,16 +119,16 @@ PAYPAL_WEBHOOK_ID=your_sandbox_webhook_id
 PAYPAL_BASE=https://api-m.sandbox.paypal.com
 
 PORTAL_SECRET=any_random_secret_string
-OWNER_PASSWORD=change-me
+OWNER_PASSWORD=choose_a_dashboard_password   # you type this to sign in to the Owner Dashboard
 DB_PATH=chargeguard.db
 PORT=3000
 
 # AI Provider (Gemini / OpenAI compatible)
 AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
 AI_API_KEY=your_gemini_or_openai_key
-AI_MODEL=gemini-2.5-flash
+AI_MODEL=gemini-3.5-flash
 
-# Set to true for offline mock generation without API keys
+# true = skip the model and use the keyword-rules fallback (offline tests only)
 AI_MOCK=false
 ```
 
@@ -136,7 +136,18 @@ AI_MOCK=false
 ```bash
 npm run dev
 ```
-Open **http://localhost:3000/** in your browser to view the Owner Dashboard.
+Open **http://localhost:3000/** and sign in with your `OWNER_PASSWORD` to view the Owner Dashboard.
+
+### AI transparency
+The three AI jobs call a live model (Gemini by default; any OpenAI-compatible endpoint works). If the model is
+unreachable, rate-limited, or no key is set, a deterministic keyword-rules fallback keeps the pipeline running so
+cases are never stuck. **The fallback is never silent:** it logs a warning, and the dashboard labels the proposal
+*"NO LIVE MODEL - rules fallback"* instead of *"AI model"*. Every action still goes through the same human approval gate.
+
+### Deploy (Render)
+`render.yaml` is a Render blueprint: **New + > Blueprint**, select this repo, fill the PayPal and AI secrets, deploy.
+Then set the PayPal sandbox webhook URL to `https://<your-service>.onrender.com/webhooks/paypal` and copy the new
+webhook ID into `PAYPAL_WEBHOOK_ID`. The free plan's disk is ephemeral, so stored cases reset when the service restarts.
 
 ---
 
@@ -152,6 +163,7 @@ npm test
 npm run test:case
 
 # Run AI Jobs, Schema Validation, & Approval Gate tests
+# (calls the live model if AI_API_KEY is set; AI_MOCK=true runs it offline)
 npm run test:ai
 
 # Run TypeScript compile check
@@ -174,10 +186,10 @@ npm run typecheck
    - AI Job 2 validates transaction evidence.
    - AI Job 3 drafts a polite buyer reply and queues an `ISSUE_REFUND` action.
 6. Click **Approve & Execute via PayPal**.
-7. ChargeGuard executes the refund via PayPal API, updates the Recovery Ledger, and logs resolution. **No dispute was ever filed with PayPal!**
+7. On approval the owner's edited reply appears in the customer's portal thread, and the `ISSUE_REFUND` action is sent to PayPal's sale-refund API. The customer never saw the draft before you approved it, and **no dispute was ever filed with PayPal.**
 
 ### Scenario B: Formal PayPal Dispute Ingestion
-1. Simulate or receive a `CUSTOMER.DISPUTE.CREATED` webhook.
+1. As the sandbox **personal** (buyer) account, open a dispute on a subscription payment in the Resolution Center (sandbox.paypal.com > Resolution Center). PayPal sends `CUSTOMER.DISPUTE.*` webhooks to ChargeGuard.
 2. ChargeGuard verifies the webhook signature, creates a dispute case, fetches the authoritative seller due date, and calculates remaining hours.
 3. The case is ranked at the top of the **Priority Case Queue** with an active deadline countdown.
 4. AI generates required representment evidence text based on reason code (`INR` / `SNAD`).

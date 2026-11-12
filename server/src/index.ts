@@ -7,11 +7,11 @@ import fastifyStatic from "@fastify/static";
 import { openDb, storeEvent } from "./db.js";
 import { verifyWebhook } from "./paypal.js";
 import { dispatch } from "./dispatcher.js";
-import { openCustomerCase, getCaseDetail, approveAction, rejectAction } from "./case-engine.js";
+import { openCustomerCase, getCaseDetail, approveAction, rejectAction, applyOwnerEdit } from "./case-engine.js";
 import { executeAction } from "./executor.js";
 import { generatePortalToken, verifyPortalToken, getPortalData } from "./portal.js";
 import { caseQueue, findDuplicateCharges, dunningCandidates, recoveryLedger } from "./rules.js";
-import { processCase } from "./ai-jobs.js";
+import { processCase, TONE_GUIDELINES, type MerchantTone } from "./ai-jobs.js";
 
 const db = openDb();
 const app = Fastify({ logger: true });
@@ -66,8 +66,9 @@ app.post("/portal/:token/report", async (req, reply) => {
   const { token } = req.params as { token: string };
   const sub = verifyPortalToken(token);
   if (!sub) return reply.code(403).send({ error: "invalid token" });
-  const { message } = req.body as { message: string };
-  const caseId = openCustomerCase(db, sub, message);
+  const message = (req.body as { message?: unknown } | null)?.message;
+  if (typeof message !== "string" || !message.trim() || message.length > 2000) return reply.code(400).send({ error: "message required (max 2000 chars)" });
+  const caseId = openCustomerCase(db, sub, message.trim());
   // Auto-run AI pipeline in background to triage, assemble evidence, and draft recommendation
   processCase(db, caseId).catch((err) => app.log.error({ err, caseId }, "AI case processing error"));
   return { case_id: caseId };
@@ -97,16 +98,34 @@ app.get("/api/cases/:id", async (req, reply) => {
 app.post("/api/cases/:id/process", async (req, reply) => {
   if (!ownerGuard(req)) return reply.code(401).send({ error: "unauthorized" });
   const { id } = req.params as { id: string };
-  const result = await processCase(db, Number(id));
+  const asked = (req.body as { tone?: string } | null)?.tone;
+  const tone = asked && asked in TONE_GUIDELINES ? (asked as MerchantTone) : undefined; // ponytail: unknown tone = default tone
+  const result = await processCase(db, Number(id), tone);
   return result;
 });
 
 app.post("/api/actions/:id/approve", async (req, reply) => {
   if (!ownerGuard(req)) return reply.code(401).send({ error: "unauthorized" });
   const { id } = req.params as { id: string };
-  approveAction(db, Number(id));
+  const edited = (req.body as { message?: string } | null)?.message;
+  try {
+    const cur = db.prepare("SELECT status FROM actions WHERE id = ?").get(Number(id)) as { status: string } | undefined;
+    if (!cur) return reply.code(404).send({ error: "not found" });
+    if (cur.status === "approved") {
+      // Approved earlier but the PayPal call failed: retry the execution, no second approval or edit.
+    } else {
+      if (edited !== undefined) applyOwnerEdit(db, Number(id), edited);
+      approveAction(db, Number(id));
+    }
+  } catch (err: any) {
+    return reply.code(409).send({ error: err?.message ?? "rejected" });
+  }
   await executeAction(db, Number(id));
-  return { ok: true };
+  // The executor swallows PayPal errors and leaves the action 'approved': report that honestly.
+  const a = db.prepare("SELECT status, type, paypal_response, case_id FROM actions WHERE id = ?").get(Number(id)) as any;
+  if (a.status !== "executed") return reply.code(502).send({ error: `PayPal call failed: ${a.paypal_response ?? "unknown error"}` });
+  const c = db.prepare("SELECT paypal_dispute_id FROM cases WHERE id = ?").get(a.case_id) as any;
+  return { ok: true, pushed_to_paypal: ["ISSUE_REFUND", "CANCEL_SUBSCRIPTION"].includes(a.type) || Boolean(c?.paypal_dispute_id) };
 });
 
 app.post("/api/actions/:id/reject", async (req, reply) => {
@@ -127,6 +146,7 @@ app.get("/api/rules/dunning", async (req, reply) => {
 });
 
 app.get("/api/ledger", async (req, reply) => {
+  if (!ownerGuard(req)) return reply.code(401).send({ error: "unauthorized" });
   return recoveryLedger(db);
 });
 

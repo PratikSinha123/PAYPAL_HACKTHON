@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "ai:check": "tsx src/ai-check.ts",
     "dispute": "tsx src/dispute.ts",
-    "seed": "tsx src/seed.ts"
+    "seed": "tsx src/seed.ts",
+    "start": "tsx src/index.ts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.10",
@@ -25,5 +26,8 @@
     "@types/node": "*",
     "tsx": "*",
     "typescript": "*"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

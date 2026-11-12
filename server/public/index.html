@@ -55,7 +55,7 @@
           <svg class="w-4 h-4 mr-1 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
           Financial Recovery & Deflection Ledger
         </span>
-        <span class="text-[11px] text-slate-500">Live ROI Metrics &bull; Measured against PayPal Sandbox</span>
+        <span class="text-[11px] text-slate-500">Live ROI Metrics • Measured against PayPal Sandbox</span>
       </div>
 
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -65,7 +65,7 @@
           <span class="text-xs text-slate-400 font-medium">Revenue Protected</span>
           <div class="text-2xl font-extrabold text-white mt-1" id="kpi-revenue">$0.00</div>
           <span class="inline-flex items-center text-[10px] text-emerald-400 font-semibold mt-1">
-            +100% Retained &bull; Zero Chargeback Fees
+            +100% Retained • Zero Chargeback Fees
           </span>
         </div>
 
@@ -158,7 +158,7 @@
               </span>
             </div>
             <p class="text-xs text-slate-400 mt-1">
-              Subscription: <span id="detail-sub-id" class="font-mono text-slate-300">...</span> &bull; 
+              Subscription: <span id="detail-sub-id" class="font-mono text-slate-300">...</span> • 
               Payer: <span id="detail-customer-email" class="text-slate-300">...</span>
             </p>
           </div>
@@ -320,14 +320,50 @@
     </div>
   </div>
 
+  <!-- Owner sign-in -->
+  <div id="login-overlay" class="hidden fixed inset-0 bg-slate-950 z-[60] flex items-center justify-center p-4">
+    <form onsubmit="return signIn(event)" class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-3">
+      <h3 class="text-sm font-bold text-white">Owner sign-in</h3>
+      <input id="login-pw" type="password" autocomplete="current-password" placeholder="Owner password" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-200 outline-none focus:border-blue-500">
+      <p id="login-err" class="text-xs text-rose-400"></p>
+      <button class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg">Sign in</button>
+    </form>
+  </div>
+
   <script>
+    let ownerPw = ''; try { ownerPw = sessionStorage.getItem('cg_owner_pw') || ''; } catch (e) {}
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function showLogin(msg) {
+      document.getElementById('login-err').textContent = msg || '';
+      document.getElementById('login-overlay').classList.remove('hidden');
+      document.getElementById('login-pw').focus();
+    }
+    // Every owner API call goes through here: the password is typed by the owner, never shipped in this file.
+    async function ownerFetch(url, opts = {}) {
+      const r = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), 'x-owner-password': ownerPw } });
+      if (r.status === 401) { ownerPw = ''; try { sessionStorage.removeItem('cg_owner_pw'); } catch (e) {} showLogin('Please sign in'); throw new Error('Not signed in'); }
+      return r;
+    }
+    async function signIn(ev) {
+      ev.preventDefault();
+      ownerPw = document.getElementById('login-pw').value;
+      const r = await fetch('/api/cases', { headers: { 'x-owner-password': ownerPw } });
+      if (r.status === 401) { ownerPw = ''; document.getElementById('login-err').textContent = 'Wrong password'; return false; }
+      try { sessionStorage.setItem('cg_owner_pw', ownerPw); } catch (e) {}
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('login-pw').value = '';
+      refreshData();
+      return false;
+    }
+
     let cases = [];
     let activeCaseId = null;
     let currentFilter = 'all';
 
     async function fetchLedger() {
       try {
-        const res = await fetch('/api/ledger');
+        const res = await ownerFetch('/api/ledger');
         if (!res.ok) return;
         const data = await res.json();
         document.getElementById('kpi-revenue').textContent = `$${Number(data.total_protected_usd || 0).toFixed(2)}`;
@@ -341,9 +377,8 @@
 
     async function loadCases() {
       try {
-        const res = await fetch('/api/cases', {
-          headers: { 'x-owner-password': 'change-me' }
-        });
+        const res = await ownerFetch('/api/cases', {
+});
         if (!res.ok) throw new Error('Failed to load cases');
         cases = await res.json();
         renderQueue();
@@ -397,7 +432,7 @@
                   c.reason_code === 'DUPLICATE' ? 'bg-amber-500/20 text-amber-300' :
                   c.reason_code === 'SNAD' ? 'bg-indigo-500/20 text-indigo-300' :
                   c.reason_code === 'INR' ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-700 text-slate-300'
-                }">${c.reason_code || 'UNCLASSIFIED'}</span>
+                }">${esc(c.reason_code || 'UNCLASSIFIED')}</span>
               </div>
               <div>
                 ${isOverdue ? '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/30">OVERDUE</span>' :
@@ -409,14 +444,14 @@
             </div>
 
             <div class="text-[11px] text-slate-400 truncate">
-              Sub: <span class="font-mono text-slate-300">${c.subscription_id || 'N/A'}</span>
+              Sub: <span class="font-mono text-slate-300">${esc(c.subscription_id || 'N/A')}</span>
             </div>
 
             <div class="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-800/60 text-[10px] text-slate-500">
               <span class="uppercase font-semibold tracking-wider ${
                 c.status === 'awaiting_approval' ? 'text-amber-400' :
                 c.status === 'resolved' ? 'text-emerald-400' : 'text-slate-400'
-              }">${c.status.replace('_', ' ')}</span>
+              }">${esc(c.status.replace(/_/g, ' '))}</span>
               <span>${c.source === 'customer' ? 'Customer Portal' : 'PayPal Dispute'}</span>
             </div>
           </div>
@@ -432,9 +467,8 @@
       document.getElementById('case-detail').classList.remove('hidden');
 
       try {
-        const res = await fetch(`/api/cases/${id}`, {
-          headers: { 'x-owner-password': 'change-me' }
-        });
+        const res = await ownerFetch(`/api/cases/${id}`, {
+});
         if (!res.ok) throw new Error('Failed to load case detail');
         const detail = await res.json();
         renderCaseDetail(detail);
@@ -482,7 +516,7 @@
               ${e.present === 1 
                 ? '<span class="text-emerald-400 mr-2 font-bold">✓</span>' 
                 : '<span class="text-amber-400 mr-2 font-bold">⚠</span>'}
-              <span class="${e.present === 1 ? 'text-slate-200' : 'text-slate-400'}">${e.label}</span>
+              <span class="${e.present === 1 ? 'text-slate-200' : 'text-slate-400'}">${esc(e.label)}</span>
             </span>
             <span class="font-mono text-[10px] ${e.present === 1 ? 'text-emerald-400' : 'text-amber-400'}">
               ${e.present === 1 ? 'VERIFIED' : 'MISSING'}
@@ -500,10 +534,10 @@
         msgContainer.innerHTML = msgs.map(m => `
           <div class="p-2.5 rounded-lg ${m.direction === 'in' ? 'bg-slate-950 border border-slate-800 text-slate-200' : 'bg-blue-950/40 border border-blue-900/50 text-blue-200'}">
             <div class="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-              <span>${m.direction === 'in' ? 'Customer' : 'Merchant / AI Draft'}</span>
+              <span>${m.direction === 'in' ? 'Customer' : m.status === 'draft' ? 'Draft - not sent' : 'Sent to customer'}</span>
               <span>${new Date(m.sent_at).toLocaleTimeString()}</span>
             </div>
-            <div>${m.body}</div>
+            <div>${esc(m.body)}</div>
           </div>
         `).join("");
       } else {
@@ -511,15 +545,16 @@
       }
 
       // Actions Card
-      const latestAction = d.actions?.[0];
+      const latestAction = d.actions?.find(a => a.status === 'pending' || a.status === 'approved') ?? d.actions?.[0];
+      document.getElementById('approve-btn').disabled = !['pending', 'approved'].includes(latestAction?.status);
       if (latestAction) {
         document.getElementById('action-type').textContent = latestAction.type;
         document.getElementById('action-payload').textContent = latestAction.payload || '{}';
-        document.getElementById('action-reasoning').textContent = `Status: ${latestAction.status.toUpperCase()} &bull; Proposed by: ${latestAction.proposed_by}`;
+        document.getElementById('action-reasoning').textContent = `Status: ${latestAction.status.toUpperCase()} • Source: ${latestAction.proposed_by === 'ai' ? 'AI model' : 'NO LIVE MODEL - rules fallback'}`;
         
         // Populate draft textarea with previous out message or generated action
-        const outMsg = msgs.find(m => m.direction === 'out');
-        document.getElementById('draft-message-text').value = outMsg ? outMsg.body : 'We have investigated your transaction and processed the resolution directly through your PayPal billing agreement.';
+        const outMsg = [...msgs].reverse().find(m => m.direction === 'out' && m.status === 'draft');
+        document.getElementById('draft-message-text').value = outMsg ? outMsg.body : '';
       } else {
         document.getElementById('action-type').textContent = "NO_ACTION_PENDING";
         document.getElementById('action-payload').textContent = "Click 'Re-run AI' to propose action";
@@ -530,21 +565,27 @@
       if (!activeCaseId) return;
       const btn = document.getElementById('approve-btn');
       btn.disabled = true;
-      btn.innerHTML = `<span>Executing PayPal API...</span>`;
+      btn.innerHTML = `<span>Executing...</span>`;
 
       try {
-        const caseRes = await fetch(`/api/cases/${activeCaseId}`, { headers: { 'x-owner-password': 'change-me' } });
+        const caseRes = await ownerFetch(`/api/cases/${activeCaseId}`);
         const d = await caseRes.json();
-        const action = d.actions?.[0];
+        const action = d.actions?.find(a => a.status === 'pending' || a.status === 'approved');
         if (!action) throw new Error("No pending action on this case");
 
-        const res = await fetch(`/api/actions/${action.id}/approve`, {
+        // The owner's edit travels with the approval: what is in the box is what gets sent.
+        const message = document.getElementById('draft-message-text').value;
+        const res = await ownerFetch(`/api/actions/${action.id}/approve`, {
           method: 'POST',
-          headers: { 'x-owner-password': 'change-me' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
         });
-        if (!res.ok) throw new Error("Approval failed");
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || "Approval failed");
 
-        alert("Action approved! ChargeGuard executed the call directly against PayPal.");
+        alert(out.pushed_to_paypal
+          ? "Approved. PayPal accepted the call."
+          : "Approved. Your reply is in the customer's thread. No PayPal call was needed for this case.");
         await refreshData();
         await selectCase(activeCaseId);
       } catch (e) {
@@ -560,15 +601,13 @@
       if (!confirm("Reject this proposed action?")) return;
 
       try {
-        const caseRes = await fetch(`/api/cases/${activeCaseId}`, { headers: { 'x-owner-password': 'change-me' } });
+        const caseRes = await ownerFetch(`/api/cases/${activeCaseId}`);
         const d = await caseRes.json();
-        const action = d.actions?.[0];
+        const action = d.actions?.find(a => a.status === 'pending' || a.status === 'approved');
         if (!action) throw new Error("No pending action");
 
-        await fetch(`/api/actions/${action.id}/reject`, {
-          method: 'POST',
-          headers: { 'x-owner-password': 'change-me' }
-        });
+        const res = await ownerFetch(`/api/actions/${action.id}/reject`, { method: 'POST' });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Reject failed");
 
         alert("Action rejected.");
         await refreshData();
@@ -581,9 +620,11 @@
     async function reprocessCurrentCase() {
       if (!activeCaseId) return;
       try {
-        const res = await fetch(`/api/cases/${activeCaseId}/process`, {
+        const tone = { professional: 'empathetic_professional', firm: 'firm_formal', conciliatory: 'conciliatory' }[document.getElementById('tone-select').value];
+        const res = await ownerFetch(`/api/cases/${activeCaseId}/process`, {
           method: 'POST',
-          headers: { 'x-owner-password': 'change-me' }
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tone })
         });
         if (!res.ok) throw new Error("Failed to run AI pipeline");
         alert("AI Pipeline executed! Triage, evidence, and draft updated.");
@@ -617,9 +658,9 @@
       if (!subId) return;
 
       try {
-        const res = await fetch('/api/portal-token', {
+        const res = await ownerFetch('/api/portal-token', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-owner-password': 'change-me' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subscription_id: subId })
         });
         const data = await res.json();
@@ -633,8 +674,8 @@
     }
 
     // Initial Load
-    refreshData();
-    setInterval(fetchLedger, 10000); // Poll ledger
+    if (ownerPw) refreshData(); else showLogin();
+    setInterval(() => { if (ownerPw) fetchLedger(); }, 10000); // Poll ledger
   </script>
 </body>
 </html>

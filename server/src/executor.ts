@@ -99,6 +99,13 @@ export async function executeAction(db: Db, actionId: number): Promise<void> {
     // Only now is it executed: PayPal accepted the call.
     db.prepare("UPDATE actions SET status = 'executed', executed_at = datetime('now'), paypal_response = ? WHERE id = ?").run(JSON.stringify(response ?? null), actionId);
 
+    // The reply reaches the customer only now: publish the approved draft (or the payload text) to the thread.
+    if (["SEND_BUYER_MESSAGE", "ISSUE_REFUND", "MAKE_OFFER", "ACCEPT_CLAIM"].includes(action.type)) {
+      const published = db.prepare("UPDATE messages SET status = 'sent', sent_at = datetime('now') WHERE case_id = ? AND direction = 'out' AND status = 'draft'").run(action.case_id).changes;
+      if (!published && action.type === "SEND_BUYER_MESSAGE" && payload.message)
+        db.prepare("INSERT INTO messages (case_id, direction, body, status) VALUES (?, 'out', ?, 'sent')").run(action.case_id, payload.message);
+    }
+
     // Resolve the case
     db.prepare("UPDATE cases SET status = 'resolved', resolved_at = datetime('now'), outcome = 'executed' WHERE id = ? AND status = 'executing'").run(action.case_id);
 
@@ -106,7 +113,7 @@ export async function executeAction(db: Db, actionId: number): Promise<void> {
     // Store error but don't roll back the execution status
     db.prepare("UPDATE actions SET paypal_response = ? WHERE id = ?").run(JSON.stringify({ error: err.message }), actionId);
     console.error(`action ${actionId} execution failed:`, err.message);
-    // Escalate the case
-    db.prepare("UPDATE cases SET status = 'escalated' WHERE id = ? AND status = 'executing'").run(action.case_id);
+    // Keep the case in the owner's queue with the action still 'approved', so the call can be retried.
+    db.prepare("UPDATE cases SET status = 'awaiting_approval' WHERE id = ? AND status = 'executing'").run(action.case_id);
   }
 }

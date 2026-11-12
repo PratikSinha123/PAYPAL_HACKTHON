@@ -39,6 +39,13 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     // column already exists
   }
 
+  try {
+    // 'draft' = AI/owner text not yet approved: visible to the owner only, never to the customer portal.
+    db.exec("ALTER TABLE messages ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'");
+  } catch {
+    // column already exists
+  }
+
   return db;
 }
 export type Db = ReturnType<typeof openDb>;

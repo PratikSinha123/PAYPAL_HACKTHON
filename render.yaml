@@ -1,0 +1,33 @@
+# Render blueprint: New + > Blueprint, pick this repo. Fill the secrets marked "sync: false" in the dashboard.
+services:
+  - type: web
+    name: chargeguard
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22" # better-sqlite3 ships prebuilt binaries for LTS Node, not for newer majors
+      - key: PAYPAL_BASE
+        value: https://api-m.sandbox.paypal.com
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: AI_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: AI_MODEL
+        value: gemini-3.5-flash
+      - key: AI_API_KEY
+        sync: false
+      - key: OWNER_PASSWORD # dashboard sign-in; generated, read it in the Render dashboard
+        generateValue: true
+      - key: PORTAL_SECRET
+        generateValue: true
+      - key: DB_PATH
+        value: /tmp/chargeguard.db # ponytail: the free plan disk is ephemeral; attach a paid disk to keep data across restarts

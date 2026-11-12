@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Db } from "./db.js";
-import { generateJson } from "./ai.js";
+import { generateJson, isFallback } from "./ai.js";
 import {
   getCaseDetail,
   advanceCase,
@@ -329,18 +329,15 @@ Evidence Missing: ${evidence.missing.join(", ")}`;
     }
   }
 
-  // Enqueue proposed action for the Approval Gate (strictly validated via proposeAction)
-  const actionId = proposeAction(
-    db,
-    caseId,
-    result.recommended_action.type,
-    actionPayload,
-    "ai"
-  );
+  // Enqueue proposed action for the Approval Gate (strictly validated via proposeAction).
+  // proposed_by says whether a live model or the rules fallback produced it; the dashboard shows it.
+  const source = isFallback(result) || isFallback(triage) || isFallback(evidence) ? "rules-fallback" : "ai";
+  const actionId = proposeAction(db, caseId, result.recommended_action.type, actionPayload, source);
 
-  // If buyer_message was drafted, record draft in messages table
+  // The draft is NOT a message until the owner approves: stored as a draft, hidden from the customer portal.
+  db.prepare("DELETE FROM messages WHERE case_id = ? AND direction = 'out' AND status = 'draft'").run(caseId);
   if (result.buyer_message) {
-    addMessage(db, caseId, "out", result.buyer_message);
+    addMessage(db, caseId, "out", result.buyer_message, "draft");
   }
 
   // Advance case state: evidence_assembled -> recommended -> awaiting_approval
