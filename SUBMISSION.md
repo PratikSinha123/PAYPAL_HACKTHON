@@ -2,8 +2,9 @@
 
 Paste-ready copy for the hackathon submission form (e.g. Devpost / Hackathon Dashboard).
 
+- **Live demo:** https://chargeguard-03bm.onrender.com (Owner password is in your Render Environment Variables)
 - **Repo:** https://github.com/PratikSinha123/PAYPAL_HACKTHON (MIT licence)
-- **Note:** Fill the **Live Demo URL** (your Render deployment) and **Demo Video link** (YouTube, under 3 minutes) directly in the respective submission form fields when submitting.
+- **Note:** Paste the **Live demo** URL and your **Demo video link** (YouTube, under 3 minutes) into the respective submission form fields when submitting.
 
 ## Tagline
 Resolve the complaint before it becomes a PayPal dispute. The AI proposes; the owner approves; only then does PayPal get called.
